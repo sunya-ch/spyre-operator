@@ -321,8 +321,8 @@ bundle-push: ## Push bundle image.
 	$(DOCKER) push $(BUNDLE_IMG)
 
 ## Build FBC from scratch
-catalog/template.yaml:
-	./catalog/fbc.sh "template" development $(IMAGE_TAG_BASE)-bundle
+catalog/base_template.yaml:
+	./catalog/fbc.sh "template" pr $(IMAGE_TAG_BASE)-bundle
 
 .PHONY: fbc-gen-template
 fbc-gen-template: catalog/base_template.yaml ## Generate a File Based Catalog (FBC) yaml base template
