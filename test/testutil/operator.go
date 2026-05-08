@@ -239,6 +239,10 @@ func waitForOperatorToBeReady(ctx context.Context, testConfig TestConfig, k8sCli
 		operatorPods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, operatorLabel, "")
 		checked := false
 		for _, operatorPod := range operatorPods {
+			// Verify operator pod has only one container (no kube-rbac-proxy sidecar)
+			g.Expect(operatorPod.Spec.Containers).To(HaveLen(1),
+				"Operator pod should have exactly one container (manager only, no kube-rbac-proxy sidecar)")
+
 			for _, container := range operatorPod.Spec.Containers {
 				printMessageIfPodNotRunning(operatorPod)
 				if container.Name == managerContainerName {
