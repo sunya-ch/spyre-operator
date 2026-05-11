@@ -37,16 +37,24 @@ type TestConfig struct {
 }
 
 func (config *TestConfig) SetRepositories() {
-	config.CatalogSource.Repository = config.Repository
-	config.DevicePlugin.Repository = config.Repository
-	config.DevicePluginInit.SetConfigOptions(config.Repository, config.DevicePluginInit.ExecutePolicy)
-	config.Exporter.Repository = config.Repository
-	config.ExporterMockUser.Repository = config.Repository
-	config.Operator.Repository = config.Repository
-	config.Scheduler.Repository = config.Repository
-	config.PodValidator.Repository = config.Repository
-	config.HealthChecker.Repository = config.Repository
-	config.CardManagement.SetConfigOptions(config.CardManagement.Repository, config.CardManagement.Enabled, *config.CardManagement.Config.SpyreFilter, config.CardManagement.ImagePullPolicy)
+	config.setRepositoryIfEmpty(&config.CatalogSource)
+	config.setRepositoryIfEmpty(&config.DevicePlugin)
+	config.setRepositoryIfEmpty(&config.DevicePluginInit.ImageVersion)
+	config.setRepositoryIfEmpty(&config.Exporter.ImageVersion)
+	config.setRepositoryIfEmpty(&config.ExporterMockUser)
+	config.setRepositoryIfEmpty(&config.Operator)
+	config.setRepositoryIfEmpty(&config.Scheduler)
+	config.setRepositoryIfEmpty(&config.PodValidator.ImageVersion)
+	config.setRepositoryIfEmpty(&config.HealthChecker.ImageVersion)
+	config.setRepositoryIfEmpty(&config.CardManagement.ImageVersion)
+	config.DevicePluginInit.ExecutePolicy = config.DevicePluginInit.ExecutePolicy
+	config.CardManagement.Config.SpyreFilter = config.CardManagement.Config.SpyreFilter
+}
+
+func (config *TestConfig) setRepositoryIfEmpty(img *ImageVersion) {
+	if img.Repository == "" {
+		img.Repository = config.Repository
+	}
 }
 
 type ImageVersion struct {
