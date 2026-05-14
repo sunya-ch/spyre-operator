@@ -15,6 +15,7 @@ import (
 	"time"
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
+	"github.com/ibm-aiu/spyre-operator/internal/state"
 	"github.com/ibm-aiu/spyre-operator/test/testutil"
 	testutils "github.com/ibm-aiu/spyre-operator/test/testutil"
 	. "github.com/onsi/ginkgo/v2"
@@ -71,6 +72,8 @@ var _ = BeforeSuite(func() {
 	err = spyrev1alpha1.AddToScheme(scheme)
 	Expect(err).To(BeNil())
 	err = nfdv1alpha1.AddToScheme(scheme)
+	Expect(err).To(BeNil())
+	err = state.InitializeScheme(scheme)
 	Expect(err).To(BeNil())
 	spyreV2Client, err = client.New(config, client.Options{Scheme: scheme})
 	Expect(err).To(BeNil())
