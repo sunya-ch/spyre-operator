@@ -113,18 +113,63 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			By("reverting to default modes")
 			enabledModes := DefaultModes()
 			UpdateModes(ctx, spyreV2Client, k8sClientset, len(nodeNames), enabledModes, testConfig.PseudoDeviceMode, spyrev1alpha1.Ready)
+
+			// Re-enable health checker and pod validator if they were enabled in test config
+			needsUpdate := false
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+
+			if testConfig.HealthChecker.Enabled && !clusterPolicy.Spec.HealthChecker.Enabled {
+				By("re-enabling health checker")
+				clusterPolicy.Spec.HealthChecker.Enabled = true
+				needsUpdate = true
+			}
+			if testConfig.PodValidator.Enabled && !clusterPolicy.Spec.PodValidator.Enabled {
+				By("re-enabling pod validator")
+				clusterPolicy.Spec.PodValidator.Enabled = true
+				needsUpdate = true
+			}
+
+			if needsUpdate {
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			}
 		})
 
 		It("can set NoSpyreNodes state", func() {
 			if testConfig.HasDevice || !testConfig.PseudoDeviceMode {
 				Skip(requireNoDeviceSkipMessage)
 			}
+			// Disable health checker and pod validator before removing node labels
+			// Health checker requires nodes with ibm.com/spyre.present label to schedule pods
+			// Pod validator must be disabled to allow init state to complete quickly
+			By("disabling health checker and pod validator")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			clusterPolicy.Spec.HealthChecker.Enabled = false
+			clusterPolicy.Spec.PodValidator.Enabled = false
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+
 			CleanUpNode(ctx, k8sClientset, targetNodeName)
 			enabledModes := DefaultModes()
 			UpdateModes(ctx, spyreV2Client, k8sClientset, 0, enabledModes, false, spyrev1alpha1.NoSpyreNodes)
 		})
 
 		It("can use basic mode", func() {
+			// Disable health checker for basic mode test to ensure all devices are available
+			By("disabling health checker for basic mode test")
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			if clusterPolicy.Spec.HealthChecker.Enabled {
+				clusterPolicy.Spec.HealthChecker.Enabled = false
+				UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			}
+
 			enabledModes := []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{}
 			UpdateModes(ctx, spyreV2Client, k8sClientset, len(nodeNames), enabledModes, testConfig.PseudoDeviceMode, spyrev1alpha1.Ready)
 			By("gradually allocate 25 Spyres")
@@ -419,8 +464,8 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 				}
 				tc.TestSinglePod(ctx, k8sClientset, spyreV2Client, expectedAllocatedDevices, expectedPodPhase)
 			},
-			Entry("no allocation - request all spyre_pf", func() string { return spyrePf }, getNumDevices, func() []string { return allDeviceList }, v1.PodRunning),
-			Entry("no allocation - request specific pf", func() string { return specificPf }, func() int { return 1 }, func() []string { return specificDeviceList }, v1.PodRunning),
+			Entry("no allocation - request all spyre_pf", func() string { return spyrePf }, getNumDevices, getHealthyDeviceList, v1.PodRunning),
+			Entry("no allocation - request specific pf", func() string { return specificPf }, getSingleDeviceCount, func() []string { return specificDeviceList }, v1.PodRunning),
 		)
 
 		DescribeTable("check file preparation", func(resourceNameFunc func() string, expectedTopologyFile bool) {
@@ -941,9 +986,13 @@ func getPciTopoFromSpyreNodeState(ctx context.Context) (map[string]interface{}, 
 	return pcitopoMap, nil
 }
 
+func getSingleDeviceCount() int {
+	return 1
+}
+
 func getNumDevices() int {
-	numDevices := len(allDeviceList)
-	return numDevices
+	// Return count of healthy devices (or all devices if health checker not active)
+	return len(getHealthyDeviceList())
 }
 
 func getDeviceList(ctx context.Context) (deviceList []string) {
@@ -958,6 +1007,32 @@ func getDeviceList(ctx context.Context) (deviceList []string) {
 		deviceList = append(deviceList, device)
 	}
 	return deviceList
+}
+
+// getHealthyDeviceList returns only healthy devices when health checker is enabled
+// Otherwise returns all devices
+func getHealthyDeviceList() []string {
+	ctx := context.Background()
+	spyrens, err := GetSpyreNodeState(ctx, spyreV2Client, targetNodeName)
+	if err != nil {
+		// Fallback to all devices if we can't get node state
+		return allDeviceList
+	}
+
+	// Build list of healthy devices
+	healthyDevices := []string{}
+	for _, device := range spyrens.Spec.SpyreInterfaces {
+		if device.Health == spyrev1alpha1.SpyreHealthy {
+			healthyDevices = append(healthyDevices, device.PciAddress)
+		}
+	}
+
+	// If no health status reported, return all devices
+	if len(healthyDevices) == 0 {
+		return allDeviceList
+	}
+
+	return healthyDevices
 }
 
 func commonAllocationTestCase(ctx context.Context, testNamespace string, schedulerEnabled bool) {

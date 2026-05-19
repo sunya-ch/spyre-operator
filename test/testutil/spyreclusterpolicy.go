@@ -270,7 +270,11 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 		}
 		Eventually(func(g Gomega) {
 			metricsExporterPods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, metricsExporterLabel, "")
-			g.Expect(len(metricsExporterPods)).To(BeNumerically(">=", 1))
+			if nodeCount == 0 {
+				g.Expect(len(metricsExporterPods)).To(Equal(0))
+			} else {
+				g.Expect(len(metricsExporterPods)).To(BeNumerically(">=", 1))
+			}
 			for _, pod := range metricsExporterPods {
 				printMessageIfPodNotRunning(pod)
 				g.Expect(pod.Status.Phase).To(BeEquivalentTo(v1.PodRunning))
@@ -278,7 +282,9 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 			_, err := k8sClientset.CoreV1().Services(OperatorNamespace).Get(ctx, metricsExporterName, metav1.GetOptions{})
 			g.Expect(err).To(BeNil())
 		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
-		waitForEndpoint(ctx, k8sClientset, metricsExporterName, OperatorNamespace)
+		if nodeCount > 0 {
+			waitForEndpoint(ctx, k8sClientset, metricsExporterName, OperatorNamespace)
+		}
 	} else {
 		Eventually(func(g Gomega) {
 			_, err := k8sClientset.AppsV1().DaemonSets(OperatorNamespace).Get(ctx, metricsExporterName, metav1.GetOptions{})
