@@ -97,7 +97,7 @@ func (obj *DefaultControlledObject) GetID() ControlledID {
 
 // GetObject returns transformed object
 func (obj *DefaultControlledObject) GetObject() client.Object {
-	obj.Object.SetResourceVersion("")
+	obj.SetResourceVersion("")
 	return obj.Object
 }
 
@@ -120,7 +120,7 @@ func (obj *DefaultControlledObject) TransformByPolicy(scheme *runtime.Scheme,
 
 // syncOwners commonly sync owner reference when Sync is called
 func (obj *DefaultControlledObject) syncOwners(metadata *metav1.ObjectMeta) {
-	metadata.OwnerReferences = obj.Object.GetOwnerReferences()
+	metadata.OwnerReferences = obj.GetOwnerReferences()
 }
 
 // NewControlledObject calls new function according to objectControllerMap
@@ -398,7 +398,7 @@ func (obj *Service) Ready(ctx context.Context, k8sClient client.Client) bool {
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.DefaultControlledObject.GetID(), err)
+		logger.Info("failed to get %s: %w", obj.GetID(), err)
 		return false
 	}
 	endpointsObj := types.NamespacedName{
@@ -504,7 +504,7 @@ func (obj *PersistentVolume) Ready(ctx context.Context, k8sClient client.Client)
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.DefaultControlledObject.GetID(), err)
+		logger.Info("failed to get %s: %w", obj.GetID(), err)
 		return false
 	}
 	pvObj := types.NamespacedName{
@@ -571,7 +571,7 @@ func (obj *PersistentVolumeClaim) Ready(ctx context.Context, k8sClient client.Cl
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.DefaultControlledObject.GetID(), err)
+		logger.Info("failed to get %s: %w", obj.GetID(), err)
 		return false
 	}
 	pvcObj := types.NamespacedName{
@@ -642,7 +642,7 @@ func (obj *DaemonSet) Ready(ctx context.Context, k8sClient client.Client) bool {
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.DefaultControlledObject.GetID(), err)
+		logger.Info("failed to get %s: %w", obj.GetID(), err)
 		return false
 	}
 
@@ -780,7 +780,7 @@ func (obj *Deployment) Ready(ctx context.Context, k8sClient client.Client) bool 
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get object", "id", obj.DefaultControlledObject.GetID(), "error", err)
+		logger.Info("failed to get object", "id", obj.GetID(), "error", err)
 		return false
 	}
 	return getObj.Status.UnavailableReplicas == 0 && getObj.Status.AvailableReplicas > 0
@@ -807,7 +807,7 @@ func (obj *PodValidatorDeployment) Ready(ctx context.Context, k8sClient client.C
 	logger := log.FromContext(ctx)
 	_, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.DefaultControlledObject.GetID(), err)
+		logger.Info("failed to get %s: %w", obj.GetID(), err)
 		return false
 	}
 	return true
