@@ -99,7 +99,7 @@ jobs:
         chmod +x operator-sdk_${{ env.OS }}_${{ env.ARCH }} && sudo mv operator-sdk_${{ env.OS }}_${{ env.ARCH }} /usr/local/bin/operator-sdk
     - name: Make and build bundle catalog
       env:
-        VERSION: ${{ steps.get_version.outputs.version }}-dev-${{ env.ARCH }}
+        VERSION: ${{ steps.get_version.outputs.version }}-dev
       # TODO: add bundle-validate after multi-arch build enablement
       run: |
         make bundle bundle-build bundle-push fbc-bundle-add fbc-build fbc-push
