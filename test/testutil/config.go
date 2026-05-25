@@ -47,8 +47,6 @@ func (config *TestConfig) SetRepositories() {
 	config.setRepositoryIfEmpty(&config.PodValidator.ImageVersion)
 	config.setRepositoryIfEmpty(&config.HealthChecker.ImageVersion)
 	config.setRepositoryIfEmpty(&config.CardManagement.ImageVersion)
-	config.DevicePluginInit.ExecutePolicy = config.DevicePluginInit.ExecutePolicy
-	config.CardManagement.Config.SpyreFilter = config.CardManagement.Config.SpyreFilter
 }
 
 func (config *TestConfig) setRepositoryIfEmpty(img *ImageVersion) {
@@ -74,21 +72,9 @@ type DevicePluginInitConfig struct {
 	ExecutePolicy     spyrev1alpha1.ExecutePolicy `yaml:"executePolicy,omitempty"`
 }
 
-func (dpi *DevicePluginInitConfig) SetConfigOptions(repository string, executePolicy spyrev1alpha1.ExecutePolicy) {
-	dpi.Repository = repository
-	dpi.ExecutePolicy = executePolicy
-}
-
 type CardManagementConfig struct {
 	OptionalComponent `yaml:",inline"`
 	Config            spyrev1alpha1.CardManagementConfig `yaml:"config"`
-}
-
-func (cm *CardManagementConfig) SetConfigOptions(repository string, enabled bool, spyreFilter string, imgPullPol string) {
-	cm.Repository = repository
-	cm.ImagePullPolicy = imgPullPol
-	cm.Enabled = enabled
-	cm.Config.SpyreFilter = &spyreFilter
 }
 
 // GetImage returns the full image.
