@@ -792,6 +792,7 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			clusterPolicy.Spec.DevicePlugin.ConfigName = configName
 			clusterPolicy.Spec.MetricsExporter.MetricsPath = metricsPath
 			clusterPolicy.Spec.MetricsExporter.Enabled = true
+			clusterPolicy.Spec.MetricsExporter.NodeSelector = map[string]string{"kubernetes.io/hostname": targetNodeName}
 			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
 			By("waiting for device plugin's environment variable change")
 			WaitForDevicePluginEnvUpdate(ctx, k8sClientset, OperatorNamespace, targetNodeName, expectedDevicePluginEnv)

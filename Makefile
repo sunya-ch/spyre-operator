@@ -51,7 +51,7 @@ export TEST_CONFIG
 # Integration test configuration variables
 # This LABEL only runs operator related tests
 INTEGRATION_TEST_LABEL ?= "integration && !cardmgmt"
-E2E_TEST_LABEL ?= "e2e && !prep-deps"
+E2E_TEST_LABEL ?= "e2e && !prop-deps"
 
 # detect-secrets
 DETECT_SECRETS_GIT ?= "https://github.com/ibm/detect-secrets.git@master\#egg=detect-secrets"
@@ -344,7 +344,10 @@ fbc-build-setup: ## Setup for the catalog building
 	$(OPM) validate catalog/spyre-operator/
 
 .PHONY: fbc-build
-fbc-build: opm fbc-bundle-add fbc-build-setup  ## Build catalog image for the build host architecture
+fbc-build: opm fbc-bundle-add fbc-build-setup fbc-docker-build ## Build catalog image for the build host architecture
+
+.PHONY: fbc-docker-build
+fbc-docker-build: ## Build catalog image from catalog folder
 	$(DOCKER) build $(DOCKER_BUILD_OPTS) \
 		--tag $(CATALOG_IMG) \
 		--file $(REPO_ROOT)/catalog/catalog.Dockerfile catalog/
