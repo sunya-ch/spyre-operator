@@ -37,7 +37,7 @@ healthChecker:
   version: 1.3.0-dev
   imagePullPolicy: Always
 draDriver:
-  image: spyre-dra-driver
+  image: dra-driver-spyre
   version: 1.3.0-dev
   imagePullPolicy: Always
 exporter:

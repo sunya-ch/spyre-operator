@@ -251,6 +251,7 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 				Entry("no Spyre nodes", spyrev1alpha1.NoSpyreNodes, false),
 				Entry("no NFD", spyrev1alpha1.NoNFD, false),
 			)
+
 		})
 	})
 })

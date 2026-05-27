@@ -166,7 +166,7 @@ func newDefaultObject(ctx context.Context,
 // newSpecificDaemonSet returns name-specific controlled DaemonSet
 func newSpecificDaemonSet(obj *appsv1.DaemonSet, ds *DaemonSet) ControlledObject {
 	switch {
-	case obj.Name == spyreconst.DevicePluginResourceName:
+	case obj.Name == spyreconst.DevicePluginResourceName || obj.Name == spyreconst.DRADriverResourceName:
 		return &DevicePluginDaemonset{
 			DaemonSet: ds,
 		}
@@ -180,10 +180,6 @@ func newSpecificDaemonSet(obj *appsv1.DaemonSet, ds *DaemonSet) ControlledObject
 		}
 	case strings.HasPrefix(obj.Name, spyreconst.CardManagementResourceName):
 		return &CardManagementDaemonset{
-			DaemonSet: ds,
-		}
-	case obj.Name == spyreconst.DRADriverResourceName:
-		return &DevicePluginDaemonset{
 			DaemonSet: ds,
 		}
 	default:

@@ -22,6 +22,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	testDeviceID = "0001:00:00.0"
+	testPodName  = "test-pod"
+)
+
 var _ = Describe("SpyreNodeState State", Ordered, func() {
 	ctx := context.Background()
 	cpName := "spyrenodestate-test-policy"
@@ -120,9 +125,9 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			nodeState.Status = spyrev1alpha1.SpyreNodeStateStatus{
 				AllocationList: []spyrev1alpha1.Allocation{
 					{
-						DeviceList: []string{"0001:00:00.0"},
+						DeviceList: []string{testDeviceID},
 						Pod: &spyrev1alpha1.Pod{
-							Name:      "test-pod",
+							Name:      testPodName,
 							Namespace: "default",
 						},
 						ResourcePool: "spyre_pf",
@@ -135,7 +140,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			By("creating the pod referenced in allocation")
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
+					Name:      testPodName,
 					Namespace: "default",
 				},
 				Spec: corev1.PodSpec{
@@ -153,7 +158,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			By("waiting for pod to be created and available")
 			Eventually(func(g Gomega) {
 				createdPod := &corev1.Pod{}
-				err := K8sClient.Get(ctx, client.ObjectKey{Namespace: "default", Name: "test-pod"}, createdPod)
+				err := K8sClient.Get(ctx, client.ObjectKey{Namespace: "default", Name: testPodName}, createdPod)
 				g.Expect(err).To(BeNil())
 			}).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond).Should(Succeed())
 
@@ -163,7 +168,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("active device plugin workload"))
 			Expect(err.Error()).To(ContainSubstring("default/test-pod"))
 
-			By("cleaning up")
+			By("cleaning up the test pod and nodeState")
 			K8sClient.Delete(ctx, pod)
 			K8sClient.Delete(ctx, nodeState)
 		})
@@ -188,7 +193,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			err = spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
 			Expect(err).To(BeNil())
 
-			By("cleaning up")
+			By("cleaning up the nodeState")
 			K8sClient.Delete(ctx, nodeState)
 		})
 
@@ -204,7 +209,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 				Status: spyrev1alpha1.SpyreNodeStateStatus{
 					AllocationList: []spyrev1alpha1.Allocation{
 						{
-							DeviceList: []string{"0001:00:00.0"},
+							DeviceList: []string{testDeviceID},
 							Pod: &spyrev1alpha1.Pod{
 								Name:      "non-existent-pod",
 								Namespace: "default",
@@ -221,7 +226,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 			err = spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
 			Expect(err).To(BeNil())
 
-			By("cleaning up")
+			By("cleaning up the nodeState")
 			K8sClient.Delete(ctx, nodeState)
 		})
 
@@ -282,7 +287,7 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 				Status: spyrev1alpha1.SpyreNodeStateStatus{
 					AllocationList: []spyrev1alpha1.Allocation{
 						{
-							DeviceList:   []string{"0001:00:00.0"},
+							DeviceList:   []string{testDeviceID},
 							Pod:          nil,
 							ResourcePool: "spyre_pf",
 						},

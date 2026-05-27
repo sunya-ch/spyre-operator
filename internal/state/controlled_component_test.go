@@ -388,6 +388,44 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 		)
 	})
 
+	Context("GetControlledObjects", func() {
+		It("can get controlled objects from path", func() {
+			componentName := spyreconst.DevicePluginResourceName
+			componentPath := filepath.Join(AssetsPath, "state-core-components", componentName)
+			component, err := NewControlledComponent(ctx, StateClient, StateScheme, componentPath, OpNs, componentName)
+			Expect(err).To(BeNil())
+
+			objects, err := component.GetControlledObjects(ctx, StateScheme, componentPath, "")
+			Expect(err).To(BeNil())
+			Expect(len(objects)).To(BeNumerically(">", 0))
+		})
+
+		It("should handle invalid path", func() {
+			componentPath := filepath.Join(AssetsPath, "non-existent-path")
+			component := &ControlledComponent{}
+			component.ExportSetClient(K8sClient)
+
+			_, err := component.GetControlledObjects(ctx, StateScheme, componentPath, "")
+			Expect(err).NotTo(BeNil())
+		})
+	})
+
+	Context("Component state management", func() {
+		It("can check if component is ready when disabled", func() {
+			component := &ControlledComponent{}
+			component.SetDisable(true)
+			ready := component.Ready(ctx)
+			Expect(ready).To(BeTrue())
+		})
+
+		It("can get component name", func() {
+			componentName := "test-component"
+			component := &ControlledComponent{}
+			component.ExportSetName(componentName)
+			Expect(component.GetName()).To(Equal(componentName))
+		})
+	})
+
 })
 
 func updateNumberUnavailable(ctx context.Context, component *ControlledComponent, unavailable int) {

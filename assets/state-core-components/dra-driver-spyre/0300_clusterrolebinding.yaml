@@ -6,12 +6,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: spyre-dra-driver
+  name: dra-driver-spyre
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: spyre-dra-driver
+  name: dra-driver-spyre
 subjects:
 - kind: ServiceAccount
-  name: spyre-dra-driver
+  name: dra-driver-spyre
   namespace: "FILLED BY THE OPERATOR"

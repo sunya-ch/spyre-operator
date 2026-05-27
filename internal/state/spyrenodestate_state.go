@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-logr/logr"
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +21,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+var (
+	spyreNodeStateListErr = "failed to list SpyreNodeState: %w"
 )
 
 // SpyreNodeStateState manages SpyreNodeState resource
@@ -45,7 +50,7 @@ func (s *SpyreNodeStateState) UpdateSpyreNodeStates(ctx context.Context, cluster
 	logger.V(1).Info("getting SpyreNodeState resources")
 	nodeStateMap, nodeStateList, err := s.getNodeStateMap(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list SpyreNodeState: %w", err)
+		return fmt.Errorf(spyreNodeStateListErr, err)
 	}
 
 	logger.V(1).Info("synchronizing Node and SpyreNodeState")
@@ -80,7 +85,7 @@ func (s *SpyreNodeStateState) getNodeStateMap(ctx context.Context) (map[string]s
 	nodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
 	nodeStateMap := make(map[string]spyrev1alpha1.SpyreNodeState)
 	if err := s.k8sClient.List(ctx, nodeStateList, []client.ListOption{}...); err != nil {
-		return nil, nil, fmt.Errorf("failed to list SpyreNodeState: %w", err)
+		return nil, nil, fmt.Errorf(spyreNodeStateListErr, err)
 	}
 	return nodeStateMap, nodeStateList, nil
 }
@@ -147,31 +152,16 @@ func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Conte
 
 	nodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
 	if err := s.k8sClient.List(ctx, nodeStateList, []client.ListOption{}...); err != nil {
-		return fmt.Errorf("failed to list SpyreNodeState: %w", err)
+		return fmt.Errorf(spyreNodeStateListErr, err)
 	}
 
 	var activePods []string
 	for _, nodeState := range nodeStateList.Items {
 		for _, allocation := range nodeState.Status.AllocationList {
-			// Check if allocation has devices and a pod reference
-			if len(allocation.DeviceList) > 0 && allocation.Pod != nil {
+			if s.isActivePod(ctx, logger, allocation) {
 				podName := allocation.Pod.Name
 				podNamespace := allocation.Pod.Namespace
-				if podName == "" || podNamespace == "" {
-					continue
-				}
-
-				// Verify the pod still exists
-				pod := &corev1.Pod{}
-				key := client.ObjectKey{Namespace: podNamespace, Name: podName}
-				err := s.k8sClient.Get(ctx, key, pod)
-				if err == nil {
-					// Pod exists, this is an active workload
-					activePods = append(activePods, fmt.Sprintf("%s/%s", podNamespace, podName))
-				} else if !apierrors.IsNotFound(err) {
-					// Error other than not found - log but continue checking
-					logger.V(1).Info("error checking pod existence", "pod", fmt.Sprintf("%s/%s", podNamespace, podName), "error", err)
-				}
+				activePods = append(activePods, fmt.Sprintf("%s/%s", podNamespace, podName))
 			}
 		}
 	}
@@ -185,6 +175,31 @@ func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Conte
 	return nil
 }
 
+// isActivePod returns true if the allocation has devices and a pod reference that exists
+func (s *SpyreNodeStateState) isActivePod(ctx context.Context, logger logr.Logger,
+	allocation spyrev1alpha1.Allocation) bool {
+	// Check if allocation has devices and a pod reference
+	if len(allocation.DeviceList) > 0 && allocation.Pod != nil {
+		podName := allocation.Pod.Name
+		podNamespace := allocation.Pod.Namespace
+		if podName == "" || podNamespace == "" {
+			return false
+		}
+
+		// Verify the pod still exists
+		pod := &corev1.Pod{}
+		key := client.ObjectKey{Namespace: podNamespace, Name: podName}
+		err := s.k8sClient.Get(ctx, key, pod)
+		if err == nil {
+			return true
+		} else if !apierrors.IsNotFound(err) {
+			// Error other than not found - log but continue checking
+			logger.V(1).Info("error checking pod existence", "pod", fmt.Sprintf("%s/%s", podNamespace, podName), "error", err)
+		}
+	}
+	return false
+}
+
 // DeleteAllSpyreNodeStates deletes all SpyreNodeState resources in the cluster.
 // This should only be called when DRA is enabled and no active device plugin workloads exist.
 func (s *SpyreNodeStateState) DeleteAllSpyreNodeStates(ctx context.Context) error {
@@ -193,7 +208,7 @@ func (s *SpyreNodeStateState) DeleteAllSpyreNodeStates(ctx context.Context) erro
 
 	nodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
 	if err := s.k8sClient.List(ctx, nodeStateList, []client.ListOption{}...); err != nil {
-		return fmt.Errorf("failed to list SpyreNodeState: %w", err)
+		return fmt.Errorf(spyreNodeStateListErr, err)
 	}
 
 	for _, nodeState := range nodeStateList.Items {

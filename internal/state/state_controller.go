@@ -95,18 +95,10 @@ func (c *StateController) Sync(ctx context.Context,
 		message := fmt.Sprintf("failed to sync cluster state: %v", err)
 		return spyrev1alpha1.NotReady, message, errors.New(message)
 	}
-	initSuccess, initMessage, err := c.InitState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
-	if err != nil {
-		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", initMessage), fmt.Errorf("failed to sync init components: %w", err)
-	}
-	if !initSuccess {
-		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", initMessage), nil
-	}
-	if !c.hasNFD {
-		return spyrev1alpha1.NoNFD, "no node feature discovery labels", nil
-	}
-	if c.nodeArchitecture == "" {
-		return spyrev1alpha1.NoSpyreNodes, "no Spyre nodes found", nil
+	initialReady, initialMessage, err := c.syncInitialState(ctx, clusterPolicy)
+	// Check if initial state is ready, if not, return immediately
+	if initialReady != spyrev1alpha1.Ready {
+		return initialReady, initialMessage, err
 	}
 	// SpyreNodeState is only needed for device plugin mode, not for DRA mode
 	if clusterPolicy.Spec.DevicePlugin.DRADriver {
@@ -137,6 +129,31 @@ func (c *StateController) Sync(ctx context.Context,
 			return spyrev1alpha1.NoSpyreNodes, message, errors.New(message)
 		}
 	}
+	return c.syncCoreAndPluginState(ctx, clusterPolicy)
+}
+
+// syncInitialState syncs the initial state of the cluster.
+func (c *StateController) syncInitialState(ctx context.Context,
+	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) (spyrev1alpha1.State, string, error) {
+	initSuccess, initMessage, err := c.InitState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
+	if err != nil {
+		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", initMessage), fmt.Errorf("failed to sync init components: %w", err)
+	}
+	if !initSuccess {
+		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", initMessage), nil
+	}
+	if !c.hasNFD {
+		return spyrev1alpha1.NoNFD, "no node feature discovery labels", nil
+	}
+	if c.nodeArchitecture == "" {
+		return spyrev1alpha1.NoSpyreNodes, "no Spyre nodes found", nil
+	}
+	return spyrev1alpha1.Ready, "", nil
+}
+
+// syncCoreAndPluginState syncs the core and plugin components of the cluster.
+func (c *StateController) syncCoreAndPluginState(ctx context.Context,
+	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) (spyrev1alpha1.State, string, error) {
 	coreSuccess, coreMessages, err := c.CoreComponentState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", coreMessages), fmt.Errorf("failed to sync core components: %w", err)

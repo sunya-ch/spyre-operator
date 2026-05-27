@@ -6,29 +6,34 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: spyre-dra-driver
+  name: dra-driver-spyre
   namespace: "FILLED BY THE OPERATOR"
   labels:
-    app: spyre-dra-driver
+    app: dra-driver-spyre
     tier: node
 spec:
   selector:
     matchLabels:
-      app: spyre-dra-driver
+      app: dra-driver-spyre
   updateStrategy:
     type: RollingUpdate
   template:
     metadata:
       labels:
-        app: spyre-dra-driver
+        app: dra-driver-spyre
     spec:
       priorityClassName: system-node-critical
-      serviceAccountName: spyre-dra-driver
+      serviceAccountName: dra-driver-spyre
       initContainers:
       - name: init-data
         image: "FILLED BY THE OPERATOR"
         securityContext:
-          privileged: true
+          runAsUser: 1001
+          runAsGroup: 0
+          runAsNonRoot: true
+          privileged: false
+          seLinuxOptions:
+            type: spc_t
         env:
         - name: VERIFY_P2P
           value: "0"
@@ -55,8 +60,13 @@ spec:
       containers:
       - name: plugin
         securityContext:
-          privileged: true
-        image: "FILLED BY THE OPERATOR"
+          runAsUser: 1001
+          runAsGroup: 0
+          runAsNonRoot: true
+          privileged: false
+          seLinuxOptions:
+            type: spc_t
+        image: "FILLED BY THE OPERATOR" # NOSONAR - Placeholder replaced by the operator
         imagePullPolicy: Always
         command: ["spyre-dra-plugin"]
         resources:
@@ -103,7 +113,7 @@ spec:
         - name: hwdata
           mountPath: "/usr/share/hwdata"
         - name: dra-driver-config
-          mountPath: /usr/local/etc/spyre-dra-driver
+          mountPath: /usr/local/etc/dra-driver-spyre
           readOnly: false
         - name: senlib-config-template
           mountPath: "/etc/senlib-config-template"
@@ -125,7 +135,7 @@ spec:
           path: "/usr/share/hwdata"
       - name: dra-driver-config
         hostPath:
-          path: /usr/local/etc/spyre-dra-driver
+          path: /usr/local/etc/dra-driver-spyre
           type: DirectoryOrCreate
       - name: senlib-config-template
         configMap:

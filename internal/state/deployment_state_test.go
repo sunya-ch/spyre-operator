@@ -126,7 +126,7 @@ var _ = Describe("DeploymentState", Ordered, func() {
 
 		BeforeEach(func() {
 			deploymentState = initDeploymentState(ctx, "state-core-components",
-				[]string{"spyre-device-plugin", "spyre-dra-driver"})
+				[]string{"spyre-device-plugin", "dra-driver-spyre"})
 		})
 
 		It("transforms device plugin deployments by SpyreClusterPolicy", func() {
@@ -288,7 +288,7 @@ var _ = Describe("DeploymentState", Ordered, func() {
 				initDeploymentState(ctx, "state-init",
 					[]string{"common", "spyre-webhook-validator", "spyre-health-checker"}),
 				initDeploymentState(ctx, "state-core-components",
-					[]string{"spyre-device-plugin", "spyre-dra-driver"}),
+					[]string{"spyre-device-plugin", "dra-driver-spyre"}),
 				initDeploymentState(ctx, "state-plugin-components",
 					[]string{"spyre-card-management", "spyre-metrics-exporter", "secondary-scheduler"}),
 			}

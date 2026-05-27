@@ -143,6 +143,89 @@ var _ = Describe("StateController", Ordered, func() {
 				deletedCount = stateController.RemoveZombieAssets(ctx)
 				Expect(deletedCount).To(Equal(8)) // config map + feature rule + non-root scc + 4 TLS cert resources + template
 			})
+
+			It("can sync cluster policy successfully", func() {
+				cp := &spyrev1alpha1.SpyreClusterPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sync-test-policy",
+						UID:  "test-uid",
+					},
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+						},
+					},
+				}
+				err := K8sClient.Create(ctx, cp)
+				Expect(err).To(BeNil())
+
+				state, message, err := stateController.Sync(ctx, cp)
+				Expect(err).To(BeNil())
+				// State should be NoSpyreNodes or NoNFD since we don't have real nodes
+				Expect(state).To(Or(Equal(spyrev1alpha1.NoSpyreNodes), Equal(spyrev1alpha1.NoNFD)))
+				Expect(message).NotTo(BeEmpty())
+
+				err = K8sClient.Delete(ctx, cp)
+				Expect(err).To(BeNil())
+			})
+
+			It("can clear all states", func() {
+				cp := &spyrev1alpha1.SpyreClusterPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "clear-test-policy",
+						UID:  "test-uid-clear",
+					},
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+						},
+					},
+				}
+				err := K8sClient.Create(ctx, cp)
+				Expect(err).To(BeNil())
+
+				// Sync first to create some resources
+				_, _, err = stateController.Sync(ctx, cp)
+				Expect(err).To(BeNil())
+
+				// Clear all states
+				err = stateController.Clear(ctx)
+				Expect(err).To(BeNil())
+
+				err = K8sClient.Delete(ctx, cp)
+				Expect(err).To(BeNil())
+			})
+
+			It("should handle DRA mode transition", func() {
+				cp := &spyrev1alpha1.SpyreClusterPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "dra-test-policy",
+						UID:  "test-uid-dra",
+					},
+					Spec: spyrev1alpha1.SpyreClusterPolicySpec{
+						DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+							DeploymentConfig: ValidDeploymentConfig("device-plugin"),
+							DRADriver:        true,
+						},
+					},
+				}
+				err := K8sClient.Create(ctx, cp)
+				Expect(err).To(BeNil())
+
+				// Sync with DRA enabled
+				state, message, err := stateController.Sync(ctx, cp)
+				Expect(err).To(BeNil())
+				// Should succeed or return NoSpyreNodes/NoNFD
+				Expect(state).To(Or(
+					Equal(spyrev1alpha1.Ready),
+					Equal(spyrev1alpha1.NoSpyreNodes),
+					Equal(spyrev1alpha1.NoNFD),
+				))
+				_ = message
+
+				err = K8sClient.Delete(ctx, cp)
+				Expect(err).To(BeNil())
+			})
 		})
 	})
 })

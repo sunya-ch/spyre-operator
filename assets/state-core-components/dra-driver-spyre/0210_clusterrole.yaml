@@ -6,7 +6,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: spyre-dra-driver
+  name: dra-driver-spyre
 rules:
 - apiGroups:
   - security.openshift.io
@@ -15,7 +15,7 @@ rules:
   verbs:
   - use
   resourceNames:
-  - privileged
+  - spyre-operator-nonroot
 - apiGroups:
   - ""
   resources:
