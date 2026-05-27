@@ -108,6 +108,25 @@ func (c *StateController) Sync(ctx context.Context,
 	if c.nodeArchitecture == "" {
 		return spyrev1alpha1.NoSpyreNodes, "no Spyre nodes found", nil
 	}
+	// SpyreNodeState is only needed for device plugin mode, not for DRA mode
+	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+		// When DRA is enabled, check for active device plugin workloads
+		if err := c.CheckActiveDevicePluginWorkloads(ctx); err != nil {
+			message := fmt.Sprintf("migration to DRA blocked: %v", err)
+			return spyrev1alpha1.NotReady, message, errors.New(message)
+		}
+		// All device plugin workloads are gone, safe to delete SpyreNodeState resources
+		if err := c.DeleteAllSpyreNodeStates(ctx); err != nil {
+			message := fmt.Sprintf("failed to delete SpyreNodeState resources: %v", err)
+			return spyrev1alpha1.NotReady, message, errors.New(message)
+		}
+	} else {
+		// Device plugin mode: update SpyreNodeState as usual
+		if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
+			message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
+			return spyrev1alpha1.NotReady, message, errors.New(message)
+		}
+	}
 	if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
 		message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
 		return spyrev1alpha1.NotReady, message, errors.New(message)

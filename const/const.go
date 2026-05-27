@@ -52,6 +52,7 @@ const (
 	HealthCheckerResourceName  = "spyre-health-checker"
 	ValidatorResourceName      = "spyre-webhook-validator"
 	DevicePluginResourceName   = "spyre-device-plugin"
+	DRADriverResourceName      = "spyre-dra-driver"
 	SchedulerResourceName      = "secondary-scheduler"
 	CardManagementResourceName = "spyre-card-management"
 	MonitorResourceName        = "spyre-metrics-exporter"

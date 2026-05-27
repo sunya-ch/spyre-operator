@@ -23,6 +23,7 @@ type Component string
 const (
 	ComponentCommonInit      Component = "commonInit"
 	ComponentDevicePlugin    Component = "devicePlugin"
+	ComponentDRADriver       Component = "draDriver"
 	ComponentCardManagement  Component = "cardManagement"
 	ComponentMetricsExporter Component = "metricsExporter"
 	ComponentScheduler       Component = "scheduler"
@@ -143,6 +144,10 @@ type DevicePluginSpec struct {
 	// P2PDMA configuration enablement on device plugin
 	// This field is applicable only for amd64 architecture.
 	P2PDMA bool `json:"p2pDMA,omitempty"`
+
+	// DRADriver indicates using DRA driver asset instead of device plugin
+	// +kubebuilder:default=false
+	DRADriver bool `json:"draDriver"`
 }
 
 // ExecutePolicy describes a policy for if/when to generate the topology file

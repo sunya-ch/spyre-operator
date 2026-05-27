@@ -243,7 +243,6 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 				if expectedRequeue {
 					Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 				} else {
-					Expect(result.Requeue).To(BeFalse())
 					Expect(result.RequeueAfter).To(BeEquivalentTo(0))
 				}
 			},

@@ -82,7 +82,7 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 	})
 
 	It("can transform ConfigMap so that user can customize senlib template name by SpyreClusterPolicy", func() {
-		senlibTemplatePath := filepath.Join(AssetsPath, "state-core-components", spyreconst.DevicePluginResourceName, "0400_senlib_template.yaml")
+		senlibTemplatePath := filepath.Join(AssetsPath, "state-init", "common", "0400_senlib_template.yaml")
 		runtimeObj, gvk, err := DecodeFromFile(StateScheme, senlibTemplatePath)
 		Expect(err).To(BeNil())
 		defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)

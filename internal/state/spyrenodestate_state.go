@@ -10,9 +10,11 @@ package state
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -134,5 +136,75 @@ func (s *SpyreNodeStateState) createSpyreNodeState(ctx context.Context,
 			return fmt.Errorf("failed to update SpyreNodeState: %w", err)
 		}
 	}
+	return nil
+}
+
+// CheckActiveDevicePluginWorkloads checks if there are any active device plugin workloads
+// by examining SpyreNodeState allocations. Returns an error with details if active workloads are found.
+func (s *SpyreNodeStateState) CheckActiveDevicePluginWorkloads(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+	logger.V(1).Info("checking for active device plugin workloads")
+
+	nodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
+	if err := s.k8sClient.List(ctx, nodeStateList, []client.ListOption{}...); err != nil {
+		return fmt.Errorf("failed to list SpyreNodeState: %w", err)
+	}
+
+	var activePods []string
+	for _, nodeState := range nodeStateList.Items {
+		for _, allocation := range nodeState.Status.AllocationList {
+			// Check if allocation has devices and a pod reference
+			if len(allocation.DeviceList) > 0 && allocation.Pod != nil {
+				podName := allocation.Pod.Name
+				podNamespace := allocation.Pod.Namespace
+				if podName == "" || podNamespace == "" {
+					continue
+				}
+
+				// Verify the pod still exists
+				pod := &corev1.Pod{}
+				key := client.ObjectKey{Namespace: podNamespace, Name: podName}
+				err := s.k8sClient.Get(ctx, key, pod)
+				if err == nil {
+					// Pod exists, this is an active workload
+					activePods = append(activePods, fmt.Sprintf("%s/%s", podNamespace, podName))
+				} else if !apierrors.IsNotFound(err) {
+					// Error other than not found - log but continue checking
+					logger.V(1).Info("error checking pod existence", "pod", fmt.Sprintf("%s/%s", podNamespace, podName), "error", err)
+				}
+			}
+		}
+	}
+
+	if len(activePods) > 0 {
+		return fmt.Errorf("cannot enable DRA driver: %d active device plugin workload(s) still running: %s. "+
+			"Please terminate all pods using Spyre devices via device plugin before enabling DRA",
+			len(activePods), strings.Join(activePods, ", "))
+	}
+
+	return nil
+}
+
+// DeleteAllSpyreNodeStates deletes all SpyreNodeState resources in the cluster.
+// This should only be called when DRA is enabled and no active device plugin workloads exist.
+func (s *SpyreNodeStateState) DeleteAllSpyreNodeStates(ctx context.Context) error {
+	logger := log.FromContext(ctx)
+	logger.Info("deleting all SpyreNodeState resources for DRA mode")
+
+	nodeStateList := &spyrev1alpha1.SpyreNodeStateList{}
+	if err := s.k8sClient.List(ctx, nodeStateList, []client.ListOption{}...); err != nil {
+		return fmt.Errorf("failed to list SpyreNodeState: %w", err)
+	}
+
+	for _, nodeState := range nodeStateList.Items {
+		logger.V(1).Info("deleting SpyreNodeState", "name", nodeState.Name)
+		if err := s.k8sClient.Delete(ctx, &nodeState); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to delete SpyreNodeState %s: %w", nodeState.Name, err)
+			}
+			// Already deleted, continue
+		}
+	}
+
 	return nil
 }

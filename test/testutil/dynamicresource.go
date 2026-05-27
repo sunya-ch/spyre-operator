@@ -15,7 +15,6 @@ import (
 
 	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +24,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 )
 
@@ -125,37 +123,6 @@ func CreateResourceFromYaml(ctx context.Context, dynClient *dynamic.DynamicClien
 		return nil, fmt.Errorf("failed to create resource %v in namespace %s: %w", rm.Resource, ns, err)
 	}
 	return object, nil
-}
-
-func DeleteNamespace(ctx context.Context, clientset *kubernetes.Clientset, namespaceName string) error {
-	err := clientset.CoreV1().Namespaces().Delete(ctx, namespaceName, metav1.DeleteOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to delete the project %s: %w", namespaceName, err)
-	}
-	return nil
-}
-
-func CreateNamespace(ctx context.Context, clientset *kubernetes.Clientset, namespaceName string) error {
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-			Labels: map[string]string{
-				// Otherwise when creating Pod w/o specify SCC would warn
-				// violate PodSecurity "restricted:v1.24": allowPrivilegeEscalation != false (container "app" must set securityContext.allowPrivilegeEscalation=false),
-				// unrestricted capabilities (container "app" must set securityContext.capabilities.drop=["ALL"]),
-				// runAsNonRoot != true (pod or container "app" must set securityContext.runAsNonRoot=true),
-				// seccompProfile (pod or container "app" must set securityContext.seccompProfile.type to "RuntimeDefault" or "Localhost")
-				"pod-security.kubernetes.io/enforce": "privileged",
-				"pod-security.kubernetes.io/audit":   "privileged",
-				"pod-security.kubernetes.io/warn":    "privileged",
-			},
-		},
-	}
-	_, err := clientset.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to create the namespace %s: %w", namespace, err)
-	}
-	return nil
 }
 
 // Return the number of spyre devices allocated to a namespaced pod in an SpyreNodeState or 0 if the Pod is not found

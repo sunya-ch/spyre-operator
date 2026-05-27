@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (tc *TestCase) TestSinglePod(ctx context.Context, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client, expectedAllocatedDevice []string, expectedPodPhase corev1.PodPhase) {
@@ -198,6 +199,15 @@ func GetSenlibConfig(ctx context.Context, k8sClientset *kubernetes.Clientset, na
 	return senlibConfig
 }
 
+// CheckAndGetAllocationsFromPodLog reads pod log, parses senlib config
+//
+// Return: allocated PCI addresses
+func CheckAndGetAllocationsFromPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, name, namespace string) []string {
+	senlibConfig := GetSenlibConfig(ctx, k8sClientset, name, namespace)
+	Expect(senlibConfig.General).NotTo(BeNil())
+	return senlibConfig.General.PciAddresses
+}
+
 func checkPodLog(ctx context.Context, k8sClientset *kubernetes.Clientset, name, namespace string, expectedAllocation map[string]bool) {
 	senlibConfig := GetSenlibConfig(ctx, k8sClientset, name, namespace)
 	totalAllocation := 0
@@ -330,6 +340,39 @@ func buildPod(name, namespace string, resourceName string, quantity int64, nodeN
 	return pod
 }
 
+// SimpleCheckPodPhases simply checks pod phase without recreation logic
+// Use for checking pods being deployed with DRA
+func SimpleCheckPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*PodTemplateData, expectedStateNum map[corev1.PodPhase]int) {
+	if len(expectedStateNum) > 0 {
+		namespace := pods[0].Namespace
+		By(fmt.Sprintf("Waiting for %v", expectedStateNum))
+		Eventually(func(g Gomega) {
+			count := make(map[corev1.PodPhase]int)
+			for _, pod := range pods {
+				pod, err := k8sClientset.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				g.Expect(err).To(BeNil())
+				if _, found := count[pod.Status.Phase]; !found {
+					count[pod.Status.Phase] = 0
+				}
+				count[pod.Status.Phase] += 1
+				if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodSucceeded {
+					if message := getPodMessage(*pod); message != "" {
+						log.Log.Info("pod is not running", "name", pod.Name, "namespace", pod.Namespace, "phase", pod.Status.Phase, "message", message)
+					}
+				}
+			}
+			for phase, num := range expectedStateNum {
+				if num == 0 {
+					continue
+				}
+				countNum, found := count[phase]
+				g.Expect(found).To(BeTrue())
+				g.Expect(countNum).To(Equal(num))
+			}
+		}).WithTimeout(7 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+	}
+}
+
 func checkPodPhases(ctx context.Context, k8sClientset *kubernetes.Clientset, pods []*corev1.Pod, expectedStateNum map[corev1.PodPhase]int) {
 	if len(expectedStateNum) > 0 {
 		namespace := pods[0].Namespace
@@ -405,6 +448,14 @@ func getPodMessage(pod corev1.Pod) string {
 }
 
 func DeletePod(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *corev1.Pod) {
+	data := &PodTemplateData{
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+	}
+	DeletePodWithData(ctx, k8sClientset, data)
+}
+
+func DeletePodWithData(ctx context.Context, k8sClientset *kubernetes.Clientset, pod *PodTemplateData) {
 	err := k8sClientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 	By(fmt.Sprintf("deleting pod %s/%s: %v", pod.Name, pod.Namespace, err))
 	if err != nil {

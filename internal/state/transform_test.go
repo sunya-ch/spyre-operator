@@ -924,7 +924,7 @@ var _ = Describe("Transform", func() {
 		)
 
 		Specify("TransformSenlibConfigTemplate works when metric exporter is enabled", func() {
-			senlibConfigMapPath := filepath.Join(AssetsPath, "state-core-components", "spyre-device-plugin", "0400_senlib_template.yaml")
+			senlibConfigMapPath := filepath.Join(AssetsPath, "state-init", "common", "0400_senlib_template.yaml")
 			runtimeObj, gvk, err := DecodeFromFile(StateScheme, senlibConfigMapPath)
 			Expect(err).To(BeNil())
 			defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)

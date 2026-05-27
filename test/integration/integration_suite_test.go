@@ -89,7 +89,7 @@ var _ = BeforeSuite(func() {
 	enabledModes := []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{
 		spyrev1alpha1.PerDeviceAllocationMode, spyrev1alpha1.TopologyAwareAllocationMode, spyrev1alpha1.ReservationMode}
 	testutil.DeployClusterPolicy(ctx, itConfig, k8sClientset, spyreV2Client,
-		enabledModes, "", len(nodeNames))
+		enabledModes, false, "", len(nodeNames))
 
 	By("force second scheduler Pod to pull image")
 	schedImage := fmt.Sprintf("%s/%s:%s",

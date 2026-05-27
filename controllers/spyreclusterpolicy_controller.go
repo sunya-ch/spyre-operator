@@ -138,9 +138,9 @@ func (r *SpyreClusterPolicyReconciler) Reconcile(ctx context.Context, req ctrl.R
 		if err := r.updateCRState(ctx, req.NamespacedName, overallStatus, message); err != nil {
 			// failed to update, requeue if processed result has no requeue
 			spyreerr.LogErrUpdate(logger, err)
-			noRequeueResult := !result.Requeue && result.RequeueAfter == 0
+			noRequeueResult := result.RequeueAfter == 0
 			if noRequeueResult {
-				return ctrl.Result{Requeue: true}, nil
+				return ctrl.Result{RequeueAfter: time.Second}, nil
 			}
 		}
 	}

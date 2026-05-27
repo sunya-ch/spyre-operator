@@ -26,6 +26,7 @@ const (
 	devicePluginContainerName         = "spyre-device-plugin"
 	operatorLabel                     = "control-plane=spyre-operator"
 	devicePluginLabel                 = "app=spyre-device-plugin"
+	draDriverLabel                    = "app=spyre-dra-driver"
 	nfdWorkerLabel                    = "app=nfd-worker"
 	cardManagementLabel               = "app=cardmgmt"
 	metricsExporterLabel              = "app=spyre-metrics-exporter"

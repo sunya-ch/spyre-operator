@@ -1,0 +1,132 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025 All Rights Reserved                      |
+# | PID 5698-SPR                                                      |
+# +-------------------------------------------------------------------+
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spyre-dra-driver
+  namespace: "FILLED BY THE OPERATOR"
+  labels:
+    app: spyre-dra-driver
+    tier: node
+spec:
+  selector:
+    matchLabels:
+      app: spyre-dra-driver
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: spyre-dra-driver
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: spyre-dra-driver
+      initContainers:
+      - name: init-data
+        image: "FILLED BY THE OPERATOR"
+        securityContext:
+          privileged: true
+        env:
+        - name: VERIFY_P2P
+          value: "0"
+        - name: FLEX_COMPUTE
+          value: SENTIENT
+        - name: FLEX_DEVICE
+          value: VFIO
+        - name: DTLOG_LEVEL
+          value: "error"
+        - name: TORCH_SENDNN_LOG
+          value: "CRITICAL"
+        - name: DT_DEEPRT_VERBOSE
+          value: "-1"
+        volumeMounts:
+        - name: dra-driver-config
+          mountPath: /usr/local/etc/device-plugins # common local path for init container
+          readOnly: false
+      nodeSelector:
+        ibm.com/spyre.present: "true"
+      tolerations:
+      - key: ibm.com/spyre
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: plugin
+        securityContext:
+          privileged: true
+        image: "FILLED BY THE OPERATOR"
+        imagePullPolicy: Always
+        command: ["spyre-dra-plugin"]
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+            ephemeral-storage: 2M
+          requests:
+            cpu: 10m
+            memory: 128Mi
+            ephemeral-storage: 1M
+        livenessProbe:
+          grpc:
+            port: 51515
+            service: liveness
+          failureThreshold: 3
+          periodSeconds: 10
+        env:
+        - name: CDI_ROOT
+          value: /var/run/cdi
+        - name: KUBELET_REGISTRAR_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins_registry"
+        - name: KUBELET_PLUGINS_DIRECTORY_PATH
+          value: "/var/lib/kubelet/plugins"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: HEALTHCHECK_PORT
+          value: "51515"
+        volumeMounts:
+        - name: plugins-registry
+          mountPath: "/var/lib/kubelet/plugins_registry"
+        - name: plugins
+          mountPath: "/var/lib/kubelet/plugins"
+        - name: cdi
+          mountPath: /var/run/cdi
+        - name: log
+          mountPath: /var/log
+        - name: hwdata
+          mountPath: "/usr/share/hwdata"
+        - name: dra-driver-config
+          mountPath: /usr/local/etc/spyre-dra-driver
+          readOnly: false
+        - name: senlib-config-template
+          mountPath: "/etc/senlib-config-template"
+      volumes:
+      - name: plugins-registry
+        hostPath:
+          path: "/var/lib/kubelet/plugins_registry"
+      - name: plugins
+        hostPath:
+          path: "/var/lib/kubelet/plugins"
+      - name: cdi
+        hostPath:
+          path: /var/run/cdi
+      - name: log
+        hostPath:
+          path: /var/log
+      - name: hwdata
+        hostPath:
+          path: "/usr/share/hwdata"
+      - name: dra-driver-config
+        hostPath:
+          path: /usr/local/etc/spyre-dra-driver
+          type: DirectoryOrCreate
+      - name: senlib-config-template
+        configMap:
+          name: senlib-config-template

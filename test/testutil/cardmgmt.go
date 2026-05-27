@@ -100,16 +100,6 @@ func EnabledCardmgmtForWorkers(ctx context.Context, clusterPolicy *spyrev2.Spyre
 	UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeList.Items), spyrev2.Ready)
 }
 
-type PodTemplateData struct {
-	Name             string
-	Image            string
-	ResourceName     string
-	ResourceQuantity string
-	NodeSelectorNode string
-	FlexDevice       string
-	SidecarName      string
-}
-
 var (
 	nospyre = PodTemplateData{
 		Name:  "nospyre",

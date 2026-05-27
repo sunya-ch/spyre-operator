@@ -126,7 +126,7 @@ var _ = Describe("DeploymentState", Ordered, func() {
 
 		BeforeEach(func() {
 			deploymentState = initDeploymentState(ctx, "state-core-components",
-				[]string{"spyre-device-plugin"})
+				[]string{"spyre-device-plugin", "spyre-dra-driver"})
 		})
 
 		It("transforms device plugin deployments by SpyreClusterPolicy", func() {
@@ -142,6 +142,12 @@ var _ = Describe("DeploymentState", Ordered, func() {
 			Expect(err).To(BeNil())
 			err = deploymentState.Transform(cp, Cluster)
 			Expect(err).To(BeNil())
+			found, disabled := deploymentState.IsDisabled(spyreconst.DevicePluginResourceName)
+			Expect(found).To(BeTrue())
+			Expect(disabled).To(BeFalse())
+			found, disabled = deploymentState.IsDisabled(spyreconst.DRADriverResourceName)
+			Expect(found).To(BeTrue())
+			Expect(disabled).To(BeTrue())
 			By("checking device plugin")
 			devicePluginDaemonSetID := ControlledID{
 				Name:      spyreconst.DevicePluginResourceName,
@@ -149,6 +155,41 @@ var _ = Describe("DeploymentState", Ordered, func() {
 				Kind:      "DaemonSet",
 			}
 			obj := deploymentState.GetObject(spyreconst.DevicePluginResourceName, devicePluginDaemonSetID)
+			runtimeObj := obj.GetObject()
+			deploy, ok := runtimeObj.(*appsv1.DaemonSet)
+			Expect(ok).To(BeTrue())
+			Expect(deploy.Namespace).To(Equal(OpNs))
+			checkValidImage(deploy.Spec.Template.Spec, devicePluginDeploymentConfig)
+			checkOwner(deploy.ObjectMeta, cpName)
+		})
+
+		It("enables dra driver", func() {
+			cp := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := K8sClient.Get(ctx, client.ObjectKey{Name: cpName}, cp)
+			Expect(err).To(BeNil())
+			devicePluginDeploymentConfig := ValidDeploymentConfig("dra-driver")
+			cp.Spec = spyrev1alpha1.SpyreClusterPolicySpec{
+				DevicePlugin: spyrev1alpha1.DevicePluginSpec{
+					DeploymentConfig: devicePluginDeploymentConfig,
+					DRADriver:        true,
+				},
+			}
+			Expect(err).To(BeNil())
+			err = deploymentState.Transform(cp, Cluster)
+			Expect(err).To(BeNil())
+			found, disabled := deploymentState.IsDisabled(spyreconst.DevicePluginResourceName)
+			Expect(found).To(BeTrue())
+			Expect(disabled).To(BeTrue())
+			found, disabled = deploymentState.IsDisabled(spyreconst.DRADriverResourceName)
+			Expect(found).To(BeTrue())
+			Expect(disabled).To(BeFalse())
+			By("checking dra driver")
+			draDriverDaemonSetID := ControlledID{
+				Name:      spyreconst.DRADriverResourceName,
+				Namespace: OpNs,
+				Kind:      "DaemonSet",
+			}
+			obj := deploymentState.GetObject(spyreconst.DRADriverResourceName, draDriverDaemonSetID)
 			runtimeObj := obj.GetObject()
 			deploy, ok := runtimeObj.(*appsv1.DaemonSet)
 			Expect(ok).To(BeTrue())
@@ -247,7 +288,7 @@ var _ = Describe("DeploymentState", Ordered, func() {
 				initDeploymentState(ctx, "state-init",
 					[]string{"common", "spyre-webhook-validator", "spyre-health-checker"}),
 				initDeploymentState(ctx, "state-core-components",
-					[]string{"spyre-device-plugin"}),
+					[]string{"spyre-device-plugin", "spyre-dra-driver"}),
 				initDeploymentState(ctx, "state-plugin-components",
 					[]string{"spyre-card-management", "spyre-metrics-exporter", "secondary-scheduler"}),
 			}
@@ -267,6 +308,7 @@ var _ = Describe("DeploymentState", Ordered, func() {
 				// all components
 				spyrev1alpha1.ComponentCommonInit,
 				spyrev1alpha1.ComponentDevicePlugin,
+				spyrev1alpha1.ComponentDRADriver,
 				spyrev1alpha1.ComponentCardManagement,
 				spyrev1alpha1.ComponentMetricsExporter,
 				spyrev1alpha1.ComponentScheduler,
