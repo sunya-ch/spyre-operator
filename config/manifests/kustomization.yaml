@@ -17,5 +17,3 @@ replacements:
       name: spyre-operator.v0.0.0
     fieldPaths:
     - metadata.annotations.containerImage
-#  Copyright (c) 2025, 2026 IBM Corp.
-#  SPDX-License-Identifier: Apache-2.0
