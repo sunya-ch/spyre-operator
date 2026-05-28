@@ -118,7 +118,7 @@ var _ = BeforeSuite(func() {
 		enabledModes = append(enabledModes, spyrev1alpha1.PseudoDeviceMode)
 	}
 	testutil.DeployClusterPolicy(ctx, testConfig, k8sClientset, spyreV2Client,
-		enabledModes, "", len(nodeNames))
+		enabledModes, false, "", len(nodeNames))
 
 	By("force second scheduler Pod to pull image")
 	schedImage := fmt.Sprintf("%s/%s:%s",

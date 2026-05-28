@@ -82,7 +82,7 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 	})
 
 	It("can transform ConfigMap so that user can customize senlib template name by SpyreClusterPolicy", func() {
-		senlibTemplatePath := filepath.Join(AssetsPath, "state-core-components", spyreconst.DevicePluginResourceName, "0400_senlib_template.yaml")
+		senlibTemplatePath := filepath.Join(AssetsPath, "state-init", "common", "0400_senlib_template.yaml")
 		runtimeObj, gvk, err := DecodeFromFile(StateScheme, senlibTemplatePath)
 		Expect(err).To(BeNil())
 		defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)
@@ -386,6 +386,44 @@ var _ = Describe("ControlledComponent", Ordered, func() {
 			Entry("when ibm.com/spyre_pf is 0 in capacity", func() *int64 { v := int64(0); return &v }(), false),
 			Entry("when no ibm.com/spyre_pf exists in capacity", nil, false),
 		)
+	})
+
+	Context("GetControlledObjects", func() {
+		It("can get controlled objects from path", func() {
+			componentName := spyreconst.DevicePluginResourceName
+			componentPath := filepath.Join(AssetsPath, "state-core-components", componentName)
+			component, err := NewControlledComponent(ctx, StateClient, StateScheme, componentPath, OpNs, componentName)
+			Expect(err).To(BeNil())
+
+			objects, err := component.GetControlledObjects(ctx, StateScheme, componentPath, "")
+			Expect(err).To(BeNil())
+			Expect(len(objects)).To(BeNumerically(">", 0))
+		})
+
+		It("should handle invalid path", func() {
+			componentPath := filepath.Join(AssetsPath, "non-existent-path")
+			component := &ControlledComponent{}
+			component.ExportSetClient(K8sClient)
+
+			_, err := component.GetControlledObjects(ctx, StateScheme, componentPath, "")
+			Expect(err).NotTo(BeNil())
+		})
+	})
+
+	Context("Component state management", func() {
+		It("can check if component is ready when disabled", func() {
+			component := &ControlledComponent{}
+			component.SetDisable(true)
+			ready := component.Ready(ctx)
+			Expect(ready).To(BeTrue())
+		})
+
+		It("can get component name", func() {
+			componentName := "test-component"
+			component := &ControlledComponent{}
+			component.ExportSetName(componentName)
+			Expect(component.GetName()).To(Equal(componentName))
+		})
 	})
 
 })

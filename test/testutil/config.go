@@ -23,6 +23,7 @@ type TestConfig struct {
 	Operator         ImageVersion           `yaml:"operator"`
 	DevicePlugin     ImageVersion           `yaml:"devicePlugin"`
 	DevicePluginInit DevicePluginInitConfig `yaml:"devicePluginInit"`
+	DraDriver        ImageVersion           `yaml:"draDriver"`
 	Scheduler        ImageVersion           `yaml:"scheduler"`
 	PodValidator     OptionalComponent      `yaml:"podValidator"`
 	Exporter         OptionalComponent      `yaml:"exporter"`
@@ -40,6 +41,7 @@ func (config *TestConfig) SetRepositories() {
 	config.setRepositoryIfEmpty(&config.CatalogSource)
 	config.setRepositoryIfEmpty(&config.DevicePlugin)
 	config.setRepositoryIfEmpty(&config.DevicePluginInit.ImageVersion)
+	config.setRepositoryIfEmpty(&config.DraDriver)
 	config.setRepositoryIfEmpty(&config.Exporter.ImageVersion)
 	config.setRepositoryIfEmpty(&config.ExporterMockUser)
 	config.setRepositoryIfEmpty(&config.Operator)

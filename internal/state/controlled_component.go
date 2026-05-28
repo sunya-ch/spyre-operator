@@ -21,6 +21,7 @@ import (
 	spyreerr "github.com/ibm-aiu/spyre-operator/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -154,7 +155,8 @@ func (c *ControlledComponent) deleteAll(ctx context.Context, logger logr.Logger)
 	for i := range c.objects {
 		// delete in reverse order
 		deleteObj := c.objects[len(c.objects)-1-i]
-		if err := c.client.Delete(ctx, deleteObj.GetObject()); err != nil && !apiErrors.IsNotFound(err) {
+		if err := c.client.Delete(ctx, deleteObj.GetObject()); err != nil &&
+			!apiErrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 			spyreerr.LogWarningDelete(logger, err)
 			failedList = append(failedList, deleteObj.GetID().String())
 		}
@@ -217,14 +219,14 @@ func (c *ControlledComponent) deletePodsByLabels(ctx context.Context, labels map
 	// List the pods
 	var podList corev1.PodList
 	if err = c.client.List(ctx, &podList, listOpts...); err != nil {
-		logger.V(2).Info("failed to list pods", "labels", labels, "error", err)
+		logger.V(1).Info("failed to list pods", "labels", labels, "error", err)
 		return fmt.Errorf("failed to list pod with labels %v: %w", labels, err)
 	}
 	var deleteErr error
 	// Delete each pod
 	for _, pod := range podList.Items {
 		if err := c.client.Delete(ctx, &pod); err != nil {
-			logger.V(2).Info("failed to delete pod", "name", pod.Name, "error", err)
+			logger.V(1).Info("failed to delete pod", "name", pod.Name, "error", err)
 			if deleteErr == nil {
 				deleteErr = err
 			}

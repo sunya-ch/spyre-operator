@@ -163,6 +163,28 @@ var _ = Describe("ControlledObject", Ordered, func() {
 					VfRunnerImage: &vfImage,
 				}, anSpyreFilter, pfImage, vfImage),
 		)
+
+		It("can handle DeviceClass object", func() {
+			deviceClassPath := filepath.Join(AssetsPath, "state-core-components", "dra-driver-spyre", "0500_deviceclass.yaml")
+			runtimeObj, gvk, err := DecodeFromFile(StateScheme, deviceClassPath)
+			Expect(err).To(BeNil())
+			Expect(gvk.Kind).To(Equal("DeviceClass"))
+
+			defaultObj, err := NewDefaultObject(ctx, gvk.Kind, OpNs, runtimeObj)
+			Expect(err).To(BeNil())
+
+			controlledObj, err := NewDeviceClass(defaultObj, runtimeObj, OpNs)
+			Expect(err).To(BeNil())
+			Expect(controlledObj).NotTo(BeNil())
+
+			// Test GetID
+			objID := controlledObj.GetID()
+			Expect(objID.Kind).To(Equal("DeviceClass"))
+
+			// Test GetObject
+			obj := controlledObj.GetObject()
+			Expect(obj).NotTo(BeNil())
+		})
 	})
 })
 

@@ -36,6 +36,10 @@ healthChecker:
   image: spyre-health-checker
   version: 1.3.0-dev
   imagePullPolicy: Always
+draDriver:
+  image: dra-driver-spyre
+  version: 1.3.0-dev
+  imagePullPolicy: Always
 exporter:
   enabled: false
   image: spyre-exporter

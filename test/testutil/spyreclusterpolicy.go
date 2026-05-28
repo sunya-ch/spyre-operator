@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, loglevel string) *spyrev1alpha1.SpyreClusterPolicy {
+func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, draDriverEnabled bool, loglevel string) *spyrev1alpha1.SpyreClusterPolicy {
 	clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ClusterPolicyName,
@@ -98,6 +98,15 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 	} else {
 		DisableInitContainer(clusterPolicy)
 	}
+	if draDriverEnabled {
+		clusterPolicy.Spec.DevicePlugin.DRADriver = true
+		clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
+			Repository:      testConfig.DraDriver.Repository,
+			Image:           testConfig.DraDriver.Image,
+			Version:         testConfig.DraDriver.Version,
+			ImagePullPolicy: testConfig.DraDriver.ImagePullPolicy,
+		}
+	}
 	if len(loglevel) > 0 {
 		clusterPolicy.Spec.LogLevel = &loglevel
 	}
@@ -105,8 +114,8 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 }
 
 func DeployClusterPolicy(ctx context.Context, testConfig TestConfig, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client,
-	modes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, loglevel string, nodeCount int) {
-	clusterPolicy := ClusterPolicy(testConfig, modes, loglevel)
+	modes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, draDriverEnabled bool, loglevel string, nodeCount int) {
+	clusterPolicy := ClusterPolicy(testConfig, modes, false, loglevel)
 	By("creating cluster policy state")
 	err := spyreV2Client.Create(ctx, clusterPolicy, &client.CreateOptions{})
 	Expect(err).To(BeNil())
@@ -209,9 +218,15 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 	}
 	By("checking device plugin")
 	Eventually(func(g Gomega) {
-		_, err := k8sClientset.AppsV1().DaemonSets(OperatorNamespace).Get(ctx, spyreconst.DevicePluginResourceName, metav1.GetOptions{})
+		dsName := spyreconst.DevicePluginResourceName
+		label := devicePluginLabel
+		if clusterPolicy.Spec.DevicePlugin.DRADriver {
+			dsName = spyreconst.DRADriverResourceName
+			label = draDriverLabel
+		}
+		_, err := k8sClientset.AppsV1().DaemonSets(OperatorNamespace).Get(ctx, dsName, metav1.GetOptions{})
 		g.Expect(err).To(BeNil())
-		devicePluginPods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, devicePluginLabel, "")
+		devicePluginPods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, label, "")
 		if !isCRC(ctx, k8sClientset) && nodeCount > 0 {
 			// For non crc clusters with homogeneous node types
 			g.Expect(len(devicePluginPods)).To(BeNumerically(">=", 1))

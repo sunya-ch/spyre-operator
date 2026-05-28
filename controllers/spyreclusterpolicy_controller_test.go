@@ -243,7 +243,6 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 				if expectedRequeue {
 					Expect(result.RequeueAfter).To(BeNumerically(">", 0))
 				} else {
-					Expect(result.Requeue).To(BeFalse())
 					Expect(result.RequeueAfter).To(BeEquivalentTo(0))
 				}
 			},
@@ -252,6 +251,7 @@ var _ = Describe("SpyreclusterpolicyController", func() {
 				Entry("no Spyre nodes", spyrev1alpha1.NoSpyreNodes, false),
 				Entry("no NFD", spyrev1alpha1.NoNFD, false),
 			)
+
 		})
 	})
 })

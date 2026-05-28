@@ -25,7 +25,9 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -56,6 +58,7 @@ var (
 		"NodeFeatureRule":                NewNodeFeatureRule,
 		"PersistentVolume":               NewPersistentVolume,
 		"PersistentVolumeClaim":          NewPersistentVolumeClaim,
+		"DeviceClass":                    NewDeviceClass,
 	}
 )
 
@@ -163,7 +166,7 @@ func newDefaultObject(ctx context.Context,
 // newSpecificDaemonSet returns name-specific controlled DaemonSet
 func newSpecificDaemonSet(obj *appsv1.DaemonSet, ds *DaemonSet) ControlledObject {
 	switch {
-	case obj.Name == spyreconst.DevicePluginResourceName:
+	case obj.Name == spyreconst.DevicePluginResourceName || obj.Name == spyreconst.DRADriverResourceName:
 		return &DevicePluginDaemonset{
 			DaemonSet: ds,
 		}
@@ -401,27 +404,41 @@ func (obj *Service) Ready(ctx context.Context, k8sClient client.Client) bool {
 		logger.Info("failed to get %s: %w", obj.GetID(), err)
 		return false
 	}
-	endpointsObj := types.NamespacedName{
-		Name:      getObj.Name,
-		Namespace: getObj.Namespace,
-	}
-	endpoints := &corev1.Endpoints{}
 
-	err = k8sClient.Get(ctx, endpointsObj, endpoints)
+	// List EndpointSlices for the service
+	endpointSliceList := &discoveryv1.EndpointSliceList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(getObj.Namespace),
+		client.MatchingLabels{
+			discoveryv1.LabelServiceName: getObj.Name,
+		},
+	}
+
+	err = k8sClient.List(ctx, endpointSliceList, listOpts...)
 	if err != nil {
 		spyreerr.LogErrGet(logger, err)
 		return false
 	}
-	if len(endpoints.Subsets) == 0 {
-		logger.Info("no subsets of endpoints")
+
+	if len(endpointSliceList.Items) == 0 {
+		logger.Info("no endpoint slices found")
 		return false
 	}
-	if len(endpoints.Subsets[0].Addresses) == 0 {
-		logger.Info("no addresses of endpoints")
-		return false
+
+	// Check if any endpoint slice has ready endpoints
+	for _, endpointSlice := range endpointSliceList.Items {
+		for _, endpoint := range endpointSlice.Endpoints {
+			if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
+				if len(endpoint.Addresses) > 0 {
+					logger.Info(fmt.Sprintf("%s is ready", obj.ControlledID))
+					return true
+				}
+			}
+		}
 	}
-	logger.Info(fmt.Sprintf("%s is ready", obj.ControlledID))
-	return true
+
+	logger.Info("no ready endpoints with addresses found")
+	return false
 }
 
 type MetricsExporterService struct {
@@ -1360,4 +1377,47 @@ func replaceFirstFalseWithTrue(content string) string {
 
 func replacePlaceHolder(content, placeHolder, value string) string {
 	return strings.ReplaceAll(content, placeHolder, value)
+}
+
+// object with resourcev1
+
+type DeviceClass struct {
+	*DefaultControlledObject
+	loadedObj *resourcev1.DeviceClass
+	spec      resourcev1.DeviceClassSpec
+}
+
+func NewDeviceClass(defaultObj *DefaultControlledObject,
+	runtimeObj runtime.Object, targetNamespace string) (ControlledObject, error) {
+	if obj, ok := runtimeObj.(*resourcev1.DeviceClass); ok {
+		obj.Namespace = defaultObj.Namespace
+		defaultObj.Object = obj
+		return &DeviceClass{
+			DefaultControlledObject: defaultObj,
+			loadedObj:               obj,
+			spec:                    obj.Spec,
+		}, nil
+	}
+	return nil, spyreerr.ErrParseFile
+}
+
+func (obj *DeviceClass) Fetch(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	fetchObj := &resourcev1.DeviceClass{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, fetchObj)
+	return fetchObj, err //nolint:wrapcheck
+}
+
+func (obj *DeviceClass) Sync(ctx context.Context,
+	k8sClient client.Client) (client.Object, error) {
+	getObj := &resourcev1.DeviceClass{}
+	namespacedName := types.NamespacedName{Name: obj.loadedObj.Name, Namespace: obj.loadedObj.Namespace}
+	err := k8sClient.Get(ctx, namespacedName, getObj)
+	if err != nil {
+		return nil, err //nolint:wrapcheck
+	}
+	obj.syncOwners(&getObj.ObjectMeta)
+	getObj.Spec = obj.loadedObj.Spec
+	return getObj, nil
 }

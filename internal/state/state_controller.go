@@ -95,6 +95,46 @@ func (c *StateController) Sync(ctx context.Context,
 		message := fmt.Sprintf("failed to sync cluster state: %v", err)
 		return spyrev1alpha1.NotReady, message, errors.New(message)
 	}
+	initialReady, initialMessage, err := c.syncInitialState(ctx, clusterPolicy)
+	// Check if initial state is ready, if not, return immediately
+	if initialReady != spyrev1alpha1.Ready {
+		return initialReady, initialMessage, err
+	}
+	// SpyreNodeState is only needed for device plugin mode, not for DRA mode
+	if clusterPolicy.Spec.DevicePlugin.DRADriver {
+		// When DRA is enabled, check for active device plugin workloads
+		if err := c.CheckActiveDevicePluginWorkloads(ctx); err != nil {
+			message := fmt.Sprintf("migration to DRA blocked: %v", err)
+			return spyrev1alpha1.NotReady, message, errors.New(message)
+		}
+		// All device plugin workloads are gone, safe to delete SpyreNodeState resources
+		if err := c.DeleteAllSpyreNodeStates(ctx); err != nil {
+			message := fmt.Sprintf("failed to delete SpyreNodeState resources: %v", err)
+			return spyrev1alpha1.NotReady, message, errors.New(message)
+		}
+	} else {
+		// Device plugin mode: update SpyreNodeState as usual
+		if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
+			message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
+			return spyrev1alpha1.NotReady, message, errors.New(message)
+		}
+	}
+	if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
+		message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
+		return spyrev1alpha1.NotReady, message, errors.New(message)
+	}
+	if !c.PseudoDeviceMode.Load() {
+		if !slices.Contains(supportedArchitectures, c.nodeArchitecture) {
+			message := fmt.Sprintf("%s unsupported. supported architectures: %v", c.nodeArchitecture, supportedArchitectures) //nolint:lll
+			return spyrev1alpha1.NoSpyreNodes, message, errors.New(message)
+		}
+	}
+	return c.syncCoreAndPluginState(ctx, clusterPolicy)
+}
+
+// syncInitialState syncs the initial state of the cluster.
+func (c *StateController) syncInitialState(ctx context.Context,
+	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) (spyrev1alpha1.State, string, error) {
 	initSuccess, initMessage, err := c.InitState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", initMessage), fmt.Errorf("failed to sync init components: %w", err)
@@ -108,16 +148,12 @@ func (c *StateController) Sync(ctx context.Context,
 	if c.nodeArchitecture == "" {
 		return spyrev1alpha1.NoSpyreNodes, "no Spyre nodes found", nil
 	}
-	if err := c.UpdateSpyreNodeStates(ctx, clusterPolicy); err != nil {
-		message := fmt.Sprintf("failed to update SpyreNodeState: %v", err)
-		return spyrev1alpha1.NotReady, message, errors.New(message)
-	}
-	if !c.PseudoDeviceMode.Load() {
-		if !slices.Contains(supportedArchitectures, c.nodeArchitecture) {
-			message := fmt.Sprintf("%s unsupported. supported architectures: %v", c.nodeArchitecture, supportedArchitectures) //nolint:lll
-			return spyrev1alpha1.NoSpyreNodes, message, errors.New(message)
-		}
-	}
+	return spyrev1alpha1.Ready, "", nil
+}
+
+// syncCoreAndPluginState syncs the core and plugin components of the cluster.
+func (c *StateController) syncCoreAndPluginState(ctx context.Context,
+	clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) (spyrev1alpha1.State, string, error) {
 	coreSuccess, coreMessages, err := c.CoreComponentState.TransformAndSync(ctx, clusterPolicy, c.ClusterState)
 	if err != nil {
 		return spyrev1alpha1.NotReady, fmt.Sprintf("%v", coreMessages), fmt.Errorf("failed to sync core components: %w", err)

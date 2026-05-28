@@ -14,6 +14,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const PrintSenlibConfig = "cat /etc/aiu/senlib_config.json;echo;tail -f /dev/null"
+
 const PodTemplate = `
 apiVersion: v1
 kind: Pod
@@ -181,6 +183,80 @@ spec:
     "kubernetes.io/hostname": {{.NodeSelectorNode}}
   {{end}}
 `
+
+const PodWithResourceClaimTemplate = `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+spec:
+  restartPolicy: Never
+  containers:
+  - name: app
+    image: {{ .Image }}
+    imagePullPolicy: IfNotPresent
+    {{- if .Arg0 }}
+    command: ["/bin/bash", "-c"]
+    args:
+    - "{{ .Arg0 }}"
+    {{- else }}
+    command: ["tail", "-f", "/dev/null"]
+    {{- end }}
+    resources:
+      claims:
+      - name: spyre
+  resourceClaims:
+  - name: spyre
+    resourceClaimTemplateName: {{ .ResourceClaimTemplateName }}
+  terminationGracePeriodSeconds: 0
+  {{- if .NodeSelectorNode }}
+  nodeSelector:
+    "kubernetes.io/hostname": {{ .NodeSelectorNode }}
+  {{- end }}
+`
+
+type PodTemplateData struct {
+	Name             string
+	Namespace        string
+	Image            string
+	ResourceName     string
+	ResourceQuantity string
+	NodeSelectorNode string
+	FlexDevice       string
+	SidecarName      string
+	Arg0             string
+}
+
+// BasicPodTemplateData sets default ubi image without node or arg0
+func BasicPodTemplateData(name, namespace string) *PodTemplateData {
+	return &PodTemplateData{
+		Name:      name,
+		Namespace: namespace,
+		Image:     Ubi9MicroTestImage,
+	}
+}
+
+func (p *PodTemplateData) SetImage(image string) *PodTemplateData {
+	p.Image = image
+	return p
+}
+
+func (p *PodTemplateData) SetNode(node string) *PodTemplateData {
+	p.NodeSelectorNode = node
+	return p
+}
+
+func (p *PodTemplateData) SetArg0(arg0 string) *PodTemplateData {
+	p.Arg0 = arg0
+	return p
+}
+
+// PodWithResourceClaimTemplateData holds basic PodTemplateData and ResourceClaimTemplateName
+type PodWithResourceClaimTemplateData struct {
+	PodTemplateData
+	ResourceClaimTemplateName string
+}
 
 func YamlFromTemplate(tmpl string, data any) (yamlPathName string) {
 	manifestTmpl, err := template.New("pod11").Parse(tmpl)

@@ -8,8 +8,12 @@
 package controllers
 
 import (
+	"context"
+
+	spyrev1alpha1 "github.com/ibm-aiu/spyre-operator/api/v1alpha1"
 	"github.com/ibm-aiu/spyre-operator/internal/state"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var ProcessOverallStatus = processOverallStatus
@@ -21,4 +25,8 @@ func (rec *SpyreClusterPolicyReconciler) SetStateController(stateController *sta
 
 func (rec *SpyreClusterPolicyReconciler) ApplyLogLevel(logLevel zapcore.Level) {
 	rec.stateController.SetLogLevel(logLevel)
+}
+
+func (rec *SpyreClusterPolicyReconciler) UpdateCRState(ctx context.Context, namespacedName types.NamespacedName, state spyrev1alpha1.State, message string) error {
+	return rec.updateCRState(ctx, namespacedName, state, message)
 }

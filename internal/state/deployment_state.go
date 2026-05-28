@@ -29,6 +29,7 @@ var (
 	componentToName = map[spyrev1alpha1.Component]string{
 		spyrev1alpha1.ComponentCommonInit:      "common",
 		spyrev1alpha1.ComponentDevicePlugin:    spyreconst.DevicePluginResourceName,
+		spyrev1alpha1.ComponentDRADriver:       spyreconst.DRADriverResourceName,
 		spyrev1alpha1.ComponentCardManagement:  spyreconst.CardManagementResourceName,
 		spyrev1alpha1.ComponentMetricsExporter: spyreconst.MonitorResourceName,
 		spyrev1alpha1.ComponentScheduler:       spyreconst.SchedulerResourceName,
@@ -196,6 +197,10 @@ func (s *DeploymentState) setDisabled(clusterPolicy *spyrev1alpha1.SpyreClusterP
 	for _, component := range s.components {
 		disabled := true
 		switch component.name {
+		case spyreconst.DevicePluginResourceName:
+			disabled = clusterPolicy.Spec.DevicePlugin.DRADriver
+		case spyreconst.DRADriverResourceName:
+			disabled = !clusterPolicy.Spec.DevicePlugin.DRADriver
 		case spyreconst.CardManagementResourceName:
 			disabled = !clusterPolicy.Spec.CardManagement.Enabled
 		case spyreconst.MonitorResourceName:

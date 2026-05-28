@@ -22,6 +22,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	testDeviceID = "0001:00:00.0"
+	testPodName  = "test-pod"
+)
+
 var _ = Describe("SpyreNodeState State", Ordered, func() {
 	ctx := context.Background()
 	cpName := "spyrenodestate-test-policy"
@@ -94,5 +99,210 @@ var _ = Describe("SpyreNodeState State", Ordered, func() {
 				Expect(owners[0].UID).To(BeEquivalentTo(cp.UID))
 			}
 		}).WithTimeout(20 * time.Second).WithPolling(5000 * time.Millisecond).Should(Succeed())
+	})
+
+	Describe("DRA Migration Safety", func() {
+		var spyreNodeState *SpyreNodeStateState
+
+		BeforeEach(func() {
+			spyreNodeState = NewSpyreNodeStateState(StateClient, StateScheme)
+		})
+
+		It("should detect active device plugin workloads", func() {
+			By("creating a SpyreNodeState")
+			nodeState := &spyrev1alpha1.SpyreNodeState{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+				},
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					NodeName: "test-node",
+				},
+			}
+			err := K8sClient.Create(ctx, nodeState)
+			Expect(err).To(BeNil())
+
+			By("updating SpyreNodeState status with active allocation")
+			nodeState.Status = spyrev1alpha1.SpyreNodeStateStatus{
+				AllocationList: []spyrev1alpha1.Allocation{
+					{
+						DeviceList: []string{testDeviceID},
+						Pod: &spyrev1alpha1.Pod{
+							Name:      testPodName,
+							Namespace: "default",
+						},
+						ResourcePool: "spyre_pf",
+					},
+				},
+			}
+			err = K8sClient.Status().Update(ctx, nodeState)
+			Expect(err).To(BeNil())
+
+			By("creating the pod referenced in allocation")
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "nginx",
+						},
+					},
+				},
+			}
+			err = K8sClient.Create(ctx, pod)
+			Expect(err).To(BeNil())
+
+			By("waiting for pod to be created and available")
+			Eventually(func(g Gomega) {
+				createdPod := &corev1.Pod{}
+				err := K8sClient.Get(ctx, client.ObjectKey{Namespace: "default", Name: testPodName}, createdPod)
+				g.Expect(err).To(BeNil())
+			}).WithTimeout(10 * time.Second).WithPolling(100 * time.Millisecond).Should(Succeed())
+
+			By("checking for active workloads - should find the pod")
+			err = spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("active device plugin workload"))
+			Expect(err.Error()).To(ContainSubstring("default/test-pod"))
+
+			By("cleaning up the test pod and nodeState")
+			K8sClient.Delete(ctx, pod)
+			K8sClient.Delete(ctx, nodeState)
+		})
+
+		It("should not report error when no active workloads exist", func() {
+			By("creating a SpyreNodeState with no allocations")
+			nodeState := &spyrev1alpha1.SpyreNodeState{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node-empty",
+				},
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					NodeName: "test-node-empty",
+				},
+				Status: spyrev1alpha1.SpyreNodeStateStatus{
+					AllocationList: []spyrev1alpha1.Allocation{},
+				},
+			}
+			err := K8sClient.Create(ctx, nodeState)
+			Expect(err).To(BeNil())
+
+			By("checking for active workloads - should find none")
+			err = spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
+			Expect(err).To(BeNil())
+
+			By("cleaning up the nodeState")
+			K8sClient.Delete(ctx, nodeState)
+		})
+
+		It("should ignore stale allocations (pods that no longer exist)", func() {
+			By("creating a SpyreNodeState with allocation to non-existent pod")
+			nodeState := &spyrev1alpha1.SpyreNodeState{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node-stale",
+				},
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					NodeName: "test-node-stale",
+				},
+				Status: spyrev1alpha1.SpyreNodeStateStatus{
+					AllocationList: []spyrev1alpha1.Allocation{
+						{
+							DeviceList: []string{testDeviceID},
+							Pod: &spyrev1alpha1.Pod{
+								Name:      "non-existent-pod",
+								Namespace: "default",
+							},
+							ResourcePool: "spyre_pf",
+						},
+					},
+				},
+			}
+			err := K8sClient.Create(ctx, nodeState)
+			Expect(err).To(BeNil())
+
+			By("checking for active workloads - should ignore stale allocation")
+			err = spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
+			Expect(err).To(BeNil())
+
+			By("cleaning up the nodeState")
+			K8sClient.Delete(ctx, nodeState)
+		})
+
+		It("should delete all SpyreNodeState resources", func() {
+			By("creating multiple SpyreNodeState resources")
+			nodeStates := []*spyrev1alpha1.SpyreNodeState{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node-1",
+					},
+					Spec: spyrev1alpha1.SpyreNodeStateSpec{
+						NodeName: "test-node-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node-2",
+					},
+					Spec: spyrev1alpha1.SpyreNodeStateSpec{
+						NodeName: "test-node-2",
+					},
+				},
+			}
+			for _, ns := range nodeStates {
+				err := K8sClient.Create(ctx, ns)
+				Expect(err).To(BeNil())
+			}
+
+			By("verifying SpyreNodeState resources exist")
+			nsList := &spyrev1alpha1.SpyreNodeStateList{}
+			err := K8sClient.List(ctx, nsList, &client.ListOptions{})
+			Expect(err).To(BeNil())
+			initialCount := len(nsList.Items)
+
+			By("deleting all SpyreNodeState resources")
+			err = spyreNodeState.DeleteAllSpyreNodeStates(ctx)
+			Expect(err).To(BeNil())
+
+			By("verifying all SpyreNodeState resources are deleted")
+			Eventually(func(g Gomega) {
+				nsList := &spyrev1alpha1.SpyreNodeStateList{}
+				err := K8sClient.List(ctx, nsList, &client.ListOptions{})
+				g.Expect(err).To(BeNil())
+				// Should have fewer items (only the ones created in other tests remain)
+				g.Expect(len(nsList.Items)).To(BeNumerically("<", initialCount))
+			}).WithTimeout(10 * time.Second).WithPolling(1 * time.Second).Should(Succeed())
+		})
+
+		It("should handle allocation without pod reference", func() {
+			By("creating a SpyreNodeState with allocation but no pod")
+			nodeState := &spyrev1alpha1.SpyreNodeState{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node-no-pod",
+				},
+				Spec: spyrev1alpha1.SpyreNodeStateSpec{
+					NodeName: "test-node-no-pod",
+				},
+				Status: spyrev1alpha1.SpyreNodeStateStatus{
+					AllocationList: []spyrev1alpha1.Allocation{
+						{
+							DeviceList:   []string{testDeviceID},
+							Pod:          nil,
+							ResourcePool: "spyre_pf",
+						},
+					},
+				},
+			}
+			err := K8sClient.Create(ctx, nodeState)
+			Expect(err).To(BeNil())
+
+			By("checking for active workloads - should ignore allocation without pod")
+			err = spyreNodeState.CheckActiveDevicePluginWorkloads(ctx)
+			Expect(err).To(BeNil())
+
+			By("cleaning up")
+			K8sClient.Delete(ctx, nodeState)
+		})
 	})
 })
