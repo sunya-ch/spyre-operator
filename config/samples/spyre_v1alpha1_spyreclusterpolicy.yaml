@@ -20,7 +20,6 @@ metadata:
       To enable experimental modes, add them under spec:
         spec:
           experimentalMode:
-          - pseudoDevice
           - perDeviceAllocation
 
       Available modes: pseudoDevice, perDeviceAllocation, topologyAwareAllocation,

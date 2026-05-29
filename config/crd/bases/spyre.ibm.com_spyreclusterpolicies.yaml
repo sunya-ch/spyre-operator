@@ -858,17 +858,21 @@ spec:
                 type: object
               experimentalMode:
                 description: |-
-                  ExperimentalMode lists experimental modes to be enabled. Available modes are:
+                  ExperimentalMode lists experimental modes to be enabled.
 
-                  `pseudoDevice` applies pseudo devices and pseudo topology for a testing purpose.
+                  By default, no experimental modes are enabled. Users can enable specific modes as needed.
 
-                  `perDeviceAllocation` allows devices to be specified by PCI address suffix (e.g., `spyre_pf_000a`).
+                  Available modes:
 
-                  `topologyAwareAllocation` enables policy-based topology-aware allocation (e.g., `spyre_pf_tier0`).
+                  - `pseudoDevice`: Applies pseudo devices and pseudo topology for testing purposes only
 
-                  `externalDeviceReservation` uses the second scheduler defined in `.spec.scheduler` to provide reservation.
+                  - `perDeviceAllocation`: Allows devices to be specified by PCI address suffix (e.g., `spyre_pf_000a`)
 
-                  `disableVirtualFunction` ignores vf devices regardless of availability (no spyre_vf available).
+                  - `topologyAwareAllocation`: Enables policy-based topology-aware allocation (e.g., `spyre_pf_tier0`)
+
+                  - `externalDeviceReservation`: Uses the second scheduler defined in `.spec.scheduler` to provide reservation
+
+                  - `disableVirtualFunction`: Ignores VF devices regardless of availability (no spyre_vf available)
                 items:
                   description: SpyreClusterPolicyExperimentalMode specifies available
                     experimental modes
