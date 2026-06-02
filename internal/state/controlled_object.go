@@ -37,6 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	errMsgFailedToGet = "failed to get %s: %w"
+)
+
 var (
 	objectControllerMap = map[string]func(*DefaultControlledObject, runtime.Object, string) (ControlledObject, error){
 		"ServiceAccount":                 NewServiceAccount,
@@ -401,7 +405,7 @@ func (obj *Service) Ready(ctx context.Context, k8sClient client.Client) bool {
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.GetID(), err)
+		logger.Info(errMsgFailedToGet, obj.GetID(), err)
 		return false
 	}
 
@@ -521,7 +525,7 @@ func (obj *PersistentVolume) Ready(ctx context.Context, k8sClient client.Client)
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.GetID(), err)
+		logger.Info(errMsgFailedToGet, obj.GetID(), err)
 		return false
 	}
 	pvObj := types.NamespacedName{
@@ -588,7 +592,7 @@ func (obj *PersistentVolumeClaim) Ready(ctx context.Context, k8sClient client.Cl
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.GetID(), err)
+		logger.Info(errMsgFailedToGet, obj.GetID(), err)
 		return false
 	}
 	pvcObj := types.NamespacedName{
@@ -659,7 +663,7 @@ func (obj *DaemonSet) Ready(ctx context.Context, k8sClient client.Client) bool {
 	logger := log.FromContext(ctx)
 	getObj, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.GetID(), err)
+		logger.Info(errMsgFailedToGet, obj.GetID(), err)
 		return false
 	}
 
@@ -824,7 +828,7 @@ func (obj *PodValidatorDeployment) Ready(ctx context.Context, k8sClient client.C
 	logger := log.FromContext(ctx)
 	_, err := obj.get(ctx, k8sClient)
 	if err != nil {
-		logger.Info("failed to get %s: %w", obj.GetID(), err)
+		logger.Info(errMsgFailedToGet, obj.GetID(), err)
 		return false
 	}
 	return true
