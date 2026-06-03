@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// ForcePullLatestSchedulerImage creates a Pod in "default" namespace to force-pull scheduler image on all of
+// ForcePullLatestSchedulerImage creates a Pod in "openshift-secondary-scheduler-operator" namespace to force-pull scheduler image on all of
 // control-plane nodes.
 // note: This function may leave puller Pods, and therefore caller must use CleanupForcePullPods() in DeferCleanup().
 func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes.Clientset, schedImage string) {
@@ -38,7 +38,7 @@ func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "force-sched-image-puller-",
-				Namespace:    "default",
+				Namespace:    "openshift-secondary-scheduler-operator",
 				Labels: map[string]string{
 					"app": schedForcePullPodLabel,
 				},
@@ -58,13 +58,13 @@ func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes
 				RestartPolicy: corev1.RestartPolicyNever,
 			},
 		}
-		_, err := k8sClientset.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+		_, err := k8sClientset.CoreV1().Pods("openshift-secondary-scheduler-operator").Create(ctx, pod, metav1.CreateOptions{})
 		Expect(err).To(BeNil())
 	}
 	DeferCleanup(CleanupForcePullPods, ctx, k8sClientset)
 
 	Eventually(func(g Gomega) {
-		pods, err := k8sClientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+		pods, err := k8sClientset.CoreV1().Pods("openshift-secondary-scheduler-operator").List(ctx, metav1.ListOptions{
 			LabelSelector: "app=" + schedForcePullPodLabel,
 		})
 
@@ -82,16 +82,16 @@ func ForcePullLatestSchedulerImage(ctx context.Context, k8sClientset *kubernetes
 func CleanupForcePullPods(ctx context.Context, k8sClientset *kubernetes.Clientset) {
 	By("Cleaning up image-puller pods")
 	Eventually(func(g Gomega) {
-		pods, err := k8sClientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+		pods, err := k8sClientset.CoreV1().Pods("openshift-secondary-scheduler-operator").List(ctx, metav1.ListOptions{
 			LabelSelector: "app=" + schedForcePullPodLabel,
 		})
 		g.Expect(err).To(BeNil())
 
 		for _, pod := range pods.Items {
-			err = k8sClientset.CoreV1().Pods("default").Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			err = k8sClientset.CoreV1().Pods("openshift-secondary-scheduler-operator").Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			g.Expect(err).To(BeNil())
 		}
-		pods, err = k8sClientset.CoreV1().Pods("default").List(ctx, metav1.ListOptions{
+		pods, err = k8sClientset.CoreV1().Pods("openshift-secondary-scheduler-operator").List(ctx, metav1.ListOptions{
 			LabelSelector: "app=" + schedForcePullPodLabel,
 		})
 		g.Expect(err).To(BeNil())
