@@ -12,11 +12,20 @@ apiVersion: spyre.ibm.com/v1alpha1
 kind: SpyreClusterPolicy
 metadata:
   name: spyreclusterpolicy
+  annotations:
+    note: |
+      Optional: experimentalMode can be configured to enable specific experimental features.
+      By default, no experimental modes are enabled.
+
+      To enable experimental modes, add them under spec:
+        spec:
+          experimentalMode:
+          - perDeviceAllocation
+
+      Available modes: pseudoDevice, perDeviceAllocation, topologyAwareAllocation,
+                       externalDeviceReservation, disableVirtualFunction
+      See CRD schema for detailed descriptions of each mode.
 spec:
-  experimentalMode:
-  - perDeviceAllocation
-  - topologyAwareAllocation
-  - externalDeviceReservation
   devicePlugin:
     repository: "docker.io/spyre-operator"
     image: "spyre-device-plugin"
