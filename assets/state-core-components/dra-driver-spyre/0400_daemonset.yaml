@@ -60,12 +60,7 @@ spec:
       containers:
       - name: plugin
         securityContext:
-          runAsUser: 1001
-          runAsGroup: 0
-          runAsNonRoot: true
-          privileged: false
-          seLinuxOptions:
-            type: spc_t
+          privileged: true
         image: "FILLED BY THE OPERATOR" # NOSONAR - Placeholder replaced by the operator
         imagePullPolicy: Always
         command: ["spyre-dra-plugin"]
