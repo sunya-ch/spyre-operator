@@ -19,7 +19,14 @@ updates:
     versions: ["*"]
   - dependency-name: "github.com/prometheus-operator/*"
     versions: ["*"]
+  - dependency-name: "github.com/cert-manager/cert-manager"
+    versions: ["*"]
+  - dependency-name: "github.com/onsi/ginkgo/v2"
+    versions: ["*"]
 - package-ecosystem: docker
   directory: /
   schedule:
     interval: weekly
+  ignore:
+  - dependency-name: "registry.access.redhat.com/ubi9-micro"
+    update-types: ["version-update:semver-major", "version-update:semver-minor"]
