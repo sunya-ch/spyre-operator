@@ -25,13 +25,14 @@ COPY pkg/ pkg/
 COPY internal/ internal/
 ARG BUILD_FLAGS=""
 
-ENV GOTOOLCHAIN="auto"
+ENV GOTOOLCHAIN="local"
 
-RUN echo "TARGETARCH = '${TARGETARCH}' TARGETOS='${TARGETOS}'" && \
-    echo "GO ENV DUMP: " && go env GOVERSION && go env GOTOOLDIR && \
-    CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GO111MODULE=on \
+RUN echo "TARGETARCH: ${TARGETARCH}" && \
+    echo "TARGETOS: ${TARGETOS}" && \
+    echo -n "GOVERSION: " && go env GOVERSION && \
+    echo -n "GOTOOLCHAIN: " && go env GOTOOLCHAIN && \
+    CGO_ENABLED=1 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" GO111MODULE=on GOTOOLCHAIN="${GOTOOLCHAIN}" \
     go build ${BUILD_FLAGS} -mod vendor -tags strictfipsruntime -a -o manager main.go
-
 
 RUN dnf --installroot=/tmp/ubi-micro \
     --nodocs --setopt=install_weak_deps=False \
