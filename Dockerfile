@@ -4,7 +4,7 @@
 # +-------------------------------------------------------------------+
 
 ARG BUILDER_IMAGE
-FROM ${BUILDER_IMAGE:-registry.access.redhat.com/ubi9/go-toolset:9.6-1754467841} AS builder
+FROM ${BUILDER_IMAGE:-registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778675823} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 USER root
