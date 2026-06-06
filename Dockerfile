@@ -4,7 +4,7 @@
 # +-------------------------------------------------------------------+
 
 ARG BUILDER_IMAGE
-FROM ${BUILDER_IMAGE:-registry.access.redhat.com/ubi9/go-toolset:9.6-1754467841} AS builder
+FROM ${BUILDER_IMAGE:-registry.access.redhat.com/ubi9/go-toolset:1.25.9-1778675823} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 USER root
@@ -25,13 +25,15 @@ COPY pkg/ pkg/
 COPY internal/ internal/
 ARG BUILD_FLAGS=""
 
-ENV GOTOOLCHAIN="auto"
+ENV GOTOOLCHAIN="local"
 
-RUN echo "TARGETARCH = '${TARGETARCH}' TARGETOS='${TARGETOS}'" && \
-    echo "GO ENV DUMP: " && go env GOVERSION && go env GOTOOLDIR && \
-    CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GO111MODULE=on \
+RUN echo "TARGETARCH: ${TARGETARCH}" && \
+    echo "TARGETOS: ${TARGETOS}" && \
+    echo -n "GOVERSION: " && go env GOVERSION && \
+    echo -n "GOTOOLCHAIN: " && go env GOTOOLCHAIN && \
+    echo -n "GOPROXY: " && go env GOPROXY && \
+    CGO_ENABLED=1 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" GO111MODULE=on GOTOOLCHAIN="${GOTOOLCHAIN}" \
     go build ${BUILD_FLAGS} -mod vendor -tags strictfipsruntime -a -o manager main.go
-
 
 RUN dnf --installroot=/tmp/ubi-micro \
     --nodocs --setopt=install_weak_deps=False \
