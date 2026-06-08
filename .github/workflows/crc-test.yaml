@@ -1,0 +1,47 @@
+# +-------------------------------------------------------------------+
+# | Copyright IBM Corp. 2025,2026                                     |
+# | SPDX-License-Identifier: Apache-2.0                               |
+# +-------------------------------------------------------------------+
+
+name: CRC End to End Test on amd64
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  crc-test:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ inputs.registry || 'ghcr.io/ibm-aiu' }}
+    steps:
+    - name: Checkout spyre-operator repository
+      uses: actions/checkout@v6
+      with:
+        repository: ibm-aiu/spyre-operator
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up CRC
+      uses: crc-org/crc-github-action@v1
+      with:
+        preset: openshift
+        pull-secret: ${{ secrets.CRC_PULL_SECRET }}
+        memory: 15200
+        cpus: 16
+        disk: 128
+
+    - name: Apply MachineConfig
+      timeout-minutes: 30
+      shell: bash
+      run: "#!/bin/bash -eu\n#magic___^_^___line\noc patch mcp master --type=merge
+        -p '{\"spec\":{\"paused\":true}}'\n                  #magic___^_^___line\ncat
+        config/machineconfig/amd64/50-spyre-device-plugin-selinux-minimal.yaml | \\\n
+        \ sed -e 's@machineconfiguration.openshift.io/role: worker@machineconfiguration.openshift.io/role:
+        master@g' | \\\n  oc apply -f -\n                  #magic___^_^___line\nsleep
+        10\noc get mcp master -o jsonpath=\"{.status.configuration} {.spec.configuration}\"\noc
+        patch mcp master --type=merge -p '{\"spec\":{\"paused\":false}}'\nsleep 60\n
+        \                 #magic___^_^___line\nsudo -su $USER crc stop -f\nsudo -su
+        $USER crc start\n                  #magic___^_^___line\noc wait clusteroperator/image-registry
+        --for=condition=Available=True --timeout=10m           \n"
