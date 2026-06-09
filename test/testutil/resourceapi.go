@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	resourcev1 "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -45,21 +46,22 @@ spec:
     devices:
       requests:
       - name: spyre
-        deviceClassName: spyre.ibm.com
-        {{- if gt .Count 0 }}
-        count: {{ .Count }}
-        {{- end}}
-        {{- if .PCIAddress }}
-        selectors:
-        - cel:
-            expression: |-
-              device.attributes["spyre.ibm.com"].pciAddress == "{{ .PCIAddress }}"
-        {{- else if .ProductId }}
-        selectors:
-        - cel:
-            expression: |-
-              device.attributes["spyre.ibm.com"].productId == "{{ .ProductId }}"
-        {{- end}}
+        exactly:
+          deviceClassName: spyre.ibm.com
+          {{- if gt .Count 0 }}
+          count: {{ .Count }}
+          {{- end}}
+          {{- if .PCIAddress }}
+          selectors:
+          - cel:
+              expression: |-
+                device.attributes["spyre.ibm.com"].pciAddress == "{{ .PCIAddress }}"
+          {{- else if .ProductId }}
+          selectors:
+          - cel:
+              expression: |-
+                device.attributes["spyre.ibm.com"].productId == "{{ .ProductId }}"
+          {{- end}}
       {{- if .MatchAttribute }}
       constraints:
       - requests: ["spyre"]
@@ -180,4 +182,13 @@ func buildPodWithClaim(ctx context.Context, dynClient *dynamic.DynamicClient, di
 	}
 	_, err := CreateResourceFromYaml(ctx, dynClient, discoClient, data.Namespace, yamlData)
 	Expect(err).To(BeNil())
+}
+
+func DeleteResourceClaimTemplate(ctx context.Context, k8sClientset *kubernetes.Clientset, claimName, namespace string) {
+	err := k8sClientset.ResourceV1().ResourceClaimTemplates(namespace).Delete(ctx, claimName, metav1.DeleteOptions{})
+	if err != nil {
+		Expect(errors.IsNotFound(err)).To(BeTrue())
+	} else {
+		Expect(err).To(BeNil())
+	}
 }

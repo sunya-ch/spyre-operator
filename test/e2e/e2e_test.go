@@ -748,6 +748,116 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 	})
 
+	Context("DRA Driver", Ordered, func() {
+		testClaimName := "test-claim-template"
+		testPodName := "test-pod-with-claim"
+		var productId string
+		var pciAddress string
+		numaMap := map[string]string{}
+		var originalSpec spyrev1alpha1.SpyreClusterPolicySpec
+
+		AfterAll(func() {
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			clusterPolicy.Spec = originalSpec
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+		})
+
+		BeforeAll(func() {
+			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
+			err := spyreV2Client.Get(ctx,
+				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
+			Expect(err).To(BeNil())
+			originalSpec = clusterPolicy.Spec
+			EnableDRADriver(testConfig, clusterPolicy)
+			UpdateClusterPolicy(ctx, spyreV2Client, k8sClientset, clusterPolicy, len(nodeNames), spyrev1alpha1.Ready)
+			By("getting resourceslices")
+			rs := ListResourceSlices(ctx, k8sClientset)
+			Expect(len(rs)).To(BeNumerically(">", 0))
+			found := false
+			productId = PfProductId
+			for _, rsi := range rs {
+				if *rsi.Spec.NodeName == targetNodeName {
+					Expect(len(rsi.Spec.Devices)).To(BeNumerically(">", 1))
+					productId = *rsi.Spec.Devices[0].Attributes["productId"].StringValue
+					pciAddress = *rsi.Spec.Devices[0].Attributes["pciAddress"].StringValue
+					for _, d := range rsi.Spec.Devices {
+						addr := *d.Attributes["pciAddress"].StringValue
+						numaMap[addr] = *rsi.Spec.Devices[0].Attributes["numaInfo"].StringValue
+					}
+					found = true
+					break
+				}
+			}
+			Expect(found).To(BeTrue(), "resourceslices must contain at least one devices")
+		})
+
+		AfterEach(func() {
+			DeletePodWithData(ctx, k8sClientset, &PodTemplateData{
+				Name:      testPodName,
+				Namespace: testNamespace,
+			})
+			DeleteResourceClaimTemplate(ctx, k8sClientset, testClaimName, testNamespace)
+		})
+
+		DescribeTable("single-pod allocation", func(templateData ResourceClaimTemplateData) {
+			By("deploying resourceclaimtemplate")
+			BuildResourceClaimTemplate(ctx, dynClient, discoClient, &templateData)
+			BuildPodWithClaim(ctx, dynClient, discoClient, &PodTemplateData{
+				Name:      testPodName,
+				Namespace: testNamespace,
+				Image:     Ubi9MicroTestImage,
+				Arg0:      PrintSenlibConfig,
+			}, testClaimName)
+			By("waiting for pod running")
+			pod, err := k8sClientset.CoreV1().Pods(testNamespace).Get(ctx, testPodName, metav1.GetOptions{})
+			Expect(err).To(BeNil())
+			WaitForPodRunning(ctx, k8sClientset, pod)
+			pciAddress := CheckAndGetAllocationsFromPodLog(ctx, k8sClientset, testPodName, testNamespace)
+			Expect(pciAddress).To(HaveLen(templateData.Count))
+			if templateData.PCIAddress != "" {
+				Expect(pciAddress).To(ContainElement(templateData.PCIAddress))
+			}
+			if templateData.MatchAttribute != "" {
+				numa, found := numaMap[pciAddress[0]]
+				Expect(found).To(BeTrue())
+				for _, addr := range pciAddress[1:] {
+					cmpNuma, found := numaMap[addr]
+					Expect(found).To(BeTrue())
+					Expect(cmpNuma).To(Equal(numa))
+				}
+			}
+		},
+			Entry("one device", ResourceClaimTemplateData{
+				Name:      testClaimName,
+				Namespace: testNamespace,
+				Count:     1,
+				ProductId: func() string {
+					return productId
+				}(),
+			}),
+			Entry("specific device", ResourceClaimTemplateData{
+				Name:      testClaimName,
+				Namespace: testNamespace,
+				Count:     1,
+				PCIAddress: func() string {
+					return pciAddress
+				}(),
+			}),
+			Entry("numa-aware devices", ResourceClaimTemplateData{
+				Name:      testClaimName,
+				Namespace: testNamespace,
+				Count:     2,
+				ProductId: func() string {
+					return productId
+				}(),
+				MatchAttribute: "spyre.ibm.com/numaInfo",
+			}),
+		)
+	})
+
 	// This set of tests should be executed last so that the stop / start
 	// of the daemon sets does not affect the execution of other tests
 	Context("Cluster Policy Updates", Ordered, func() {

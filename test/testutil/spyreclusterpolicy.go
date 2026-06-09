@@ -113,6 +113,36 @@ func ClusterPolicy(testConfig TestConfig, modes []spyrev1alpha1.SpyreClusterPoli
 	return clusterPolicy
 }
 
+func EnableDRADriver(testConfig TestConfig, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
+	clusterPolicy.Spec.DevicePlugin.DRADriver = true
+	clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
+		Repository:      testConfig.DraDriver.Repository,
+		Image:           testConfig.DraDriver.Image,
+		Version:         testConfig.DraDriver.Version,
+		ImagePullPolicy: testConfig.DraDriver.ImagePullPolicy,
+	}
+	// Disable unsupported components
+	clusterPolicy.Spec.HealthChecker.Enabled = false
+	clusterPolicy.Spec.MetricsExporter.Enabled = false
+	clusterPolicy.Spec.PodValidator.Enabled = false
+	clusterPolicy.Spec.CardManagement.Enabled = false
+	modes := []spyrev1alpha1.SpyreClusterPolicyExperimentalMode{}
+	if testConfig.PseudoDeviceMode {
+		modes = append(modes, spyrev1alpha1.PseudoDeviceMode)
+	}
+	clusterPolicy.Spec.ExperimentalMode = modes
+}
+
+func DisableDRADriver(testConfig TestConfig, clusterPolicy *spyrev1alpha1.SpyreClusterPolicy) {
+	clusterPolicy.Spec.DevicePlugin.DRADriver = false
+	clusterPolicy.Spec.DevicePlugin.DeploymentConfig = spyrev1alpha1.DeploymentConfig{
+		Repository:      testConfig.DevicePlugin.Repository,
+		Image:           testConfig.DevicePlugin.Image,
+		Version:         testConfig.DevicePlugin.Version,
+		ImagePullPolicy: testConfig.DevicePlugin.ImagePullPolicy,
+	}
+}
+
 func DeployClusterPolicy(ctx context.Context, testConfig TestConfig, k8sClientset *kubernetes.Clientset, spyreV2Client client.Client,
 	modes []spyrev1alpha1.SpyreClusterPolicyExperimentalMode, draDriverEnabled bool, loglevel string, nodeCount int) {
 	clusterPolicy := ClusterPolicy(testConfig, modes, false, loglevel)
@@ -168,8 +198,8 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 		err = spyreV2Client.Get(ctx, namespacedName, getObj)
 		g.Expect(err).To(BeNil())
 	}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
-	By("checking pod validator deployment")
 	if clusterPolicy.Spec.PodValidator.Enabled {
+		By("checking pod validator deployment")
 		Eventually(func(g Gomega) {
 			podValidatorPods := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, podValidatorLabel, "")
 			if clusterPolicy.Spec.PodValidator.Replicas != nil {
@@ -193,8 +223,8 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 	}
-	By("checking health checker")
 	if clusterPolicy.Spec.HealthChecker.Enabled {
+		By("checking health checker")
 		Eventually(func(g Gomega) {
 			_, err := k8sClientset.AppsV1().DaemonSets(OperatorNamespace).Get(ctx, spyreconst.HealthCheckerResourceName, metav1.GetOptions{})
 			g.Expect(err).To(BeNil())
@@ -251,8 +281,8 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 			}
 		}
 	}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
-	By("checking card management deployment")
 	if clusterPolicy.Spec.CardManagement.Enabled {
+		By("checking card management deployment")
 		Eventually(func(g Gomega) {
 			cardManagementPod := GetPodsWithLabels(ctx, k8sClientset, g, OperatorNamespace, cardManagementLabel, "")
 			if clusterPolicy.Spec.PodValidator.Replicas != nil {
@@ -272,8 +302,8 @@ func CheckOperatorAssetsRunning(ctx context.Context, spyreV2Client client.Client
 			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 	}
-	By("checking metric exporter")
 	if clusterPolicy.Spec.MetricsExporter.Enabled {
+		By("checking metric exporter")
 		ds, err := k8sClientset.AppsV1().DaemonSets(OperatorNamespace).Get(ctx, spyreconst.MonitorResourceName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		nodeSelector := ds.Spec.Template.Spec.NodeSelector

@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const PrintSenlibConfig = "cat /etc/aiu/senlib_config.json;echo;tail -f /dev/null"
+const PrintSenlibConfig = "cat /etc/aiu/senlib_config.json;tail -f /dev/null"
 
 const PodTemplate = `
 apiVersion: v1
