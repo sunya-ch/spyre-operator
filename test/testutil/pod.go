@@ -264,7 +264,7 @@ func EnsureDeletedPodWithLabels(ctx context.Context, k8sClientset *kubernetes.Cl
 }
 
 func BuildPod(name, namespace string, resourceName string, quantity int64, nodeName string, schedulerEnabled bool) *corev1.Pod {
-	arg0 := "cat /etc/aiu/senlib_config.json;tail -f /dev/null"
+	arg0 := PrintSenlibConfig
 	return buildPod(name, namespace, resourceName, quantity, nodeName, arg0, schedulerEnabled)
 }
 

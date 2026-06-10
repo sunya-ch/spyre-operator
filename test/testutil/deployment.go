@@ -225,7 +225,7 @@ func BuildDeployment(name, namespace string, resourceName string, quantity int64
 								"/bin/bash", "-c",
 							},
 							Args: []string{
-								"cat /etc/aiu/senlib_config.json;tail -f /dev/null",
+								PrintSenlibConfig,
 							},
 							Resources: v1.ResourceRequirements{
 								Requests: resourceRequest,
