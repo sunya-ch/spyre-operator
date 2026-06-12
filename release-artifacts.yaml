@@ -4,22 +4,11 @@
 # +-------------------------------------------------------------------+
 channels:
   Stable:
-    Bundles:
-    - 1.0.0
-    - 1.1.0
-    - 1.1.1
+    Bundles: []
   Candidates:
-    Bundles:
-    - 1.1.0-rc.1
-    - 1.1.0-rc.2
-    - 1.1.0-rc.3
+    Bundles: []
   Fast:
-    Bundles:
-    - 1.0.0-dev
-    - 1.1.0-dev
-    - 1.1.1-dev
-    - 1.2.0-dev
-    - 1.3.0-dev
+    Bundles: []
 exporter:
   image: spyre-exporter
   version: 1.3.0-dev
