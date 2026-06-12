@@ -133,9 +133,6 @@ case $action in
 	# The current released bundles to be included in the FBC
 	FAST_TAGS=$(yq '.channels.Fast.Bundles[]' "${ARTIFACT_CONFIG}")
 
-	[ -z "${STABLE_TAGS}" ] && [ -z "${CANDIDATE_TAGS}" ] && [ -z "${FAST_TAGS}" ] &&
-		echo "No bundles specified in the ${ARTIFACT_CONFIG}." && exit 1
-
 	BUILD_TYPE=${2:-}
 	[ -z "${BUILD_TYPE}" ] && echo "Please provide a build type" && exit 1
 
