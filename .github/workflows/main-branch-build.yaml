@@ -25,7 +25,6 @@ jobs:
     with:
       image_name: spyre-operator
       pre_build_command: make vendor
-
   build-bundle-catalog:
     runs-on: ubuntu-latest
     needs: build
@@ -37,6 +36,8 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     - name: Log in to container registry
@@ -97,9 +98,40 @@ jobs:
     - name: move operator-sdk to binary path
       run: |
         chmod +x operator-sdk_${{ env.OS }}_${{ env.ARCH }} && sudo mv operator-sdk_${{ env.OS }}_${{ env.ARCH }} /usr/local/bin/operator-sdk
-    - name: Make and build bundle catalog
+    - name: Build bundle and setup fbc
       env:
         VERSION: ${{ steps.get_version.outputs.version }}-dev
-      # TODO: add bundle-validate after multi-arch build enablement
+      # TODO: add bundle-validate when ppc64le is available
       run: |
-        make bundle bundle-build bundle-push fbc-bundle-add fbc-build fbc-push
+        make bundle bundle-build bundle-push fbc-bundle-add opm fbc-build-setup
+    - name: Make and build catalog for amd64
+      env:
+        VERSION: ${{ steps.get_version.outputs.version }}-dev-amd64
+        DOCKER_BUILD_OPTS: "--progress=plain --platform linux/amd64 --push --pull
+          --no-cache --provenance false --sbom false"
+      run: |
+        make fbc-docker-build fbc-push
+    - name: Make and build catalog for s390x
+      env:
+        VERSION: ${{ steps.get_version.outputs.version }}-dev-s390x
+        DOCKER_BUILD_OPTS: "--progress=plain --platform linux/s390x --push --pull
+          --no-cache --provenance false --sbom false"
+      run: |
+        make fbc-docker-build fbc-push
+    - name: Make and build catalog for ppc64le
+      env:
+        VERSION: ${{ steps.get_version.outputs.version }}-dev-ppc64le
+        DOCKER_BUILD_OPTS: "--progress=plain --platform linux/ppc64le --push --pull
+          --no-cache --provenance false --sbom false"
+      run: |
+        make fbc-docker-build fbc-push
+    - name: Make and push catalog manifest
+      env:
+        CATALOG_IMG: ${{ env.REGISTRY }}/spyre-operator-catalog:${{ steps.get_version.outputs.version
+          }}-dev
+      run: |
+        docker manifest create   ${CATALOG_IMG} ${CATALOG_IMG}-ppc64le ${CATALOG_IMG}-amd64 ${CATALOG_IMG}-s390x
+        docker manifest annotate ${CATALOG_IMG} ${CATALOG_IMG}-ppc64le --os linux --arch ppc64le
+        docker manifest annotate ${CATALOG_IMG} ${CATALOG_IMG}-amd64   --os linux --arch amd64
+        docker manifest annotate ${CATALOG_IMG} ${CATALOG_IMG}-s390x   --os linux --arch s390x
+        docker manifest push ${CATALOG_IMG}
