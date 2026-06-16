@@ -694,6 +694,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 			keyword := AllocationMetricLabels(firstPod.Namespace, firstPodName, targetNodeName)
 			index := strings.Index(bufStr, keyword)
 			Expect(index).Should(BeNumerically("<", 0))
+			By("deleting second pod")
+			err = k8sClientset.CoreV1().Pods(secondPod.Namespace).Delete(ctx, secondPodName, metav1.DeleteOptions{})
+			Expect(err).To(BeNil())
 		})
 
 		AfterAll(func() {
@@ -766,6 +769,9 @@ var _ = Describe("e2e test", Label("e2e"), Ordered, func() {
 		})
 
 		BeforeAll(func() {
+			By("ensuring all pods are deleted")
+			WaitUntilNoPod(ctx, k8sClientset, spyreV2Client, testNamespace, targetNodeName)
+			By("enabling dra-driver")
 			clusterPolicy := &spyrev1alpha1.SpyreClusterPolicy{}
 			err := spyreV2Client.Get(ctx,
 				client.ObjectKey{Namespace: metav1.NamespaceAll, Name: ClusterPolicyName}, clusterPolicy)
