@@ -63,3 +63,10 @@ healthChecker:
   - amd64
   - s390x
   - ppc64le
+draDriver:
+  image: dra-driver-spyre
+  version: 1.3.0-dev
+  architectures:
+  - amd64
+  - s390x
+  - ppc64le
