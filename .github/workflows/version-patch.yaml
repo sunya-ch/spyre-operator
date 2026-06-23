@@ -25,6 +25,6 @@ env:
 
 jobs:
   version-patch:
-    uses: ibm-aiu/spyre-operator-actions/.github/workflows/version-patch.yaml@main
+    uses: ibm-aiu/spyre-operator-actions/.github/workflows/version-patch.yaml@sunya-ch-operator-patch
     with:
       version_bump: ${{ inputs.version_bump }}
